@@ -85,7 +85,7 @@ class GitHubStudioFragment : Fragment() {
         }
         tokenInput = TextInputEditText(tokenLayout.context).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            singleLine = true
+            setSingleLine(true)
         }
         tokenLayout.addView(tokenInput)
         tokenColumn.addView(tokenLayout)
