@@ -188,7 +188,8 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [x] Download progress dialog; size + SHA-256 (SHA256SUMS.txt) + signing certificate যাচাই করে তবেই installer খোলা।
 - [x] Dashboard-এ "Updates" action; upstream updater launch-এ বন্ধ।
 - [x] `SelfacsVersionTest` CI-তে pass।
-- [ ] বাস্তব ডিভাইসে v0.1.1 → পরের release update flow পরীক্ষা।
+- [x] Device bug: "GitHub rate limit reached" — unauthenticated API 60/ঘণ্টা/IP, মোবাইল নেটওয়ার্কে shared IP। Fix: release workflow `update-feed` branch-এ `selfacs-update.json` (API-র মতো একই JSON) লেখে; app আগে raw.githubusercontent.com থেকে feed পড়ে, ব্যর্থ হলে API।
+- [~] বাস্তব ডিভাইসে update flow: check/What's New কাজ করে (device screenshot); download→install পুরো flow যাচাই বাকি।
 
 - Signing key কখনো repository-তে নয়; `.gitignore`-এ `*.jks`, `*.keystore`, `signing/`।
 

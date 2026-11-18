@@ -31,6 +31,12 @@ class SelfacsUpdater(context: Context) {
     const val OWNER = "faria2177"
     const val REPO = "SELFACS"
     private const val RELEASES_API = "https://api.github.com/repos/$OWNER/$REPO/releases?per_page=20"
+    /**
+     * Static copy of the releases list (same JSON shape as the API), refreshed by the release
+     * workflow. Served by raw.githubusercontent.com, so it is not subject to the 60 requests/hour
+     * API limit that shared mobile-network IPs hit quickly.
+     */
+    private const val RELEASES_FEED = "https://raw.githubusercontent.com/$OWNER/$REPO/update-feed/selfacs-update.json"
     const val RELEASES_PAGE = "https://github.com/$OWNER/$REPO/releases"
 
     private const val PREFS = "selfacs_updates"
@@ -95,17 +101,38 @@ class SelfacsUpdater(context: Context) {
       }
 
   private fun fetchReleases(): List<SelfacsVersion.Release> {
-    val conn = open(RELEASES_API)
-    conn.setRequestProperty("Accept", "application/vnd.github+json")
+    val feedError =
+        try {
+          return parseReleases(download(RELEASES_FEED, json = false))
+        } catch (e: Exception) {
+          Log.w(TAG, "Update feed unavailable, falling back to the GitHub API", e)
+          e
+        }
+    return try {
+      parseReleases(download(RELEASES_API, json = true))
+    } catch (e: Exception) {
+      throw IllegalStateException(e.message ?: feedError.message ?: "Update check failed", e)
+    }
+  }
+
+  private fun download(url: String, json: Boolean): String {
+    val conn = open(url)
+    if (json) conn.setRequestProperty("Accept", "application/vnd.github+json")
     try {
       val code = conn.responseCode
       if (code != HttpURLConnection.HTTP_OK) {
         throw IllegalStateException(
-            if (code == 403 || code == 429) "GitHub rate limit reached, try again later"
-            else "GitHub returned HTTP $code"
+            if (json && (code == 403 || code == 429)) "GitHub rate limit reached, try again later"
+            else "Update server returned HTTP $code"
         )
       }
-      val body = conn.inputStream.bufferedReader().use { it.readText() }
+      return conn.inputStream.bufferedReader().use { it.readText() }
+    } finally {
+      conn.disconnect()
+    }
+  }
+
+  private fun parseReleases(body: String): List<SelfacsVersion.Release> {
       val arr = JSONArray(body)
       return (0 until arr.length()).map { i ->
         val o = arr.getJSONObject(i)
@@ -129,9 +156,6 @@ class SelfacsUpdater(context: Context) {
                 },
         )
       }
-    } finally {
-      conn.disconnect()
-    }
   }
 
   fun apkFile(candidate: SelfacsVersion.Candidate): File {
