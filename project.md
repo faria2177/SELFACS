@@ -169,6 +169,18 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - Release cert SHA-256: `48:78:C6:1B:AC:FB:41:8E:3E:F9:71:E9:FB:17:35:99:5E:03:69:C9:29:71:A7:12:77:B1:9D:F8:35:6A:37:07`
 - Signed release: [v0.1.0](https://github.com/faria2177/SELFACS/releases/tag/v0.1.0) (pre-release, run 44283501455, APK Signature v2, cert মিলেছে)।
 - Debug release: [v0.1.0-debug.1](https://github.com/faria2177/SELFACS/releases/tag/v0.1.0-debug.1) (debug key)।
+- [x] Auto-versioned release: tag ফাঁকা রাখলে পরের patch tag (v0.1.0 → v0.1.1); versionCode = 2000 + (M·10000 + m·100 + p)·10 (+1 armeabi-v7a)।
+- [x] [v0.1.1](https://github.com/faria2177/SELFACS/releases/tag/v0.1.1) — versionCode 3010 (APK থেকে যাচাই), release notes commit থেকে।
+
+### In-app updater (code present, device test বাকি)
+- [x] GitHub Releases API থেকে নতুন stable tag খোঁজা (pre-release সহ), device ABI অনুযায়ী APK।
+- [x] App চালু হলে "Update Available" dialog (Installed → Latest, View Update / Later)।
+- [x] Updates স্ক্রিন: header, installed/latest কার্ড, Download & Install, What's New, GitHub link, Auto check toggle।
+- [x] Download progress dialog; size + SHA-256 (SHA256SUMS.txt) + signing certificate যাচাই করে তবেই installer খোলা।
+- [x] Dashboard-এ "Updates" action; upstream updater launch-এ বন্ধ।
+- [x] `SelfacsVersionTest` CI-তে pass।
+- [ ] বাস্তব ডিভাইসে v0.1.1 → পরের release update flow পরীক্ষা।
+
 - Signing key কখনো repository-তে নয়; `.gitignore`-এ `*.jks`, `*.keystore`, `signing/`।
 
 ## 6. Definition of done
