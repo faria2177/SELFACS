@@ -1,5 +1,9 @@
 # SELFACS changelog
 
+## Next
+
+- AI panel: new "Fix last build error" mode uses the last failed build automatically (no pasting), reads the affected files and proposes a fix for review.
+
 ## v0.1.2
 
 - New in-app updater: update prompt on launch, Updates screen, verified download and install.

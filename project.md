@@ -103,7 +103,8 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 
 ### P2 — AI Studio completion
 - [x] Agent tools (ধাপ ১): AI নিজে `READ_FILE` / `LIST_DIR` / `SEARCH` দিয়ে project থেকে তথ্য নেয়, সর্বোচ্চ ৬ round, read-only; path project-এ সীমিত, hidden/build/secret ফাইল বাদ; edit-এর আগে ফাইল পড়ার নিয়ম। `AgentToolsTest`।
-- [ ] Agent ধাপ ২: user অনুমতিতে build চালানো ও build error দেখে fix loop; streaming; chat/session persistence।
+- [x] Agent ধাপ ২ক: শেষ Gradle build-এর output memory-তে রাখা (bounded, secrets redacted); AI panel-এ "Fix last build error" mode — error অংশ বের করে, উল্লেখিত ফাইল পড়ে, reviewed fix প্রস্তাব। `BuildErrorsTest`।
+- [ ] Agent ধাপ ২খ: fix apply-এর পর user অনুমতিতে আবার build ও loop; streaming; chat/session persistence।
 - [ ] প্রতিটি provider-এর real connection test ও model compatibility matrix।
 - [ ] Streaming response, timeout, retry, rate-limit/quota এবং network error handling।
 - [ ] Provider/model selector ও usage/error status UX উন্নত করা।

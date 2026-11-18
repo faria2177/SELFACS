@@ -181,7 +181,7 @@ class ChatFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        val modes = arrayOf("Propose code edits", "Ask / explain", "Code review", "Project analysis", "Analyze build error")
+        val modes = arrayOf("Propose code edits", "Ask / explain", "Code review", "Project analysis", "Analyze build error", "Fix last build error")
         val modeButton = requireView().findViewById<MaterialButton>(R.id.aiModeButton)
         modeButton.text = modes[requestMode]
         modeButton.setOnClickListener {
@@ -191,7 +191,11 @@ class ChatFragment : Fragment() {
                 .setSingleChoiceItems(modes, requestMode) { dialog, index ->
                     requestMode = index
                     modeButton.text = modes[index]
-                    promptInput.hint = if (index == 4) "Paste Gradle build error or log here" else "Describe your request"
+                    promptInput.hint = when (index) {
+                        4 -> "Paste Gradle build error or log here"
+                        5 -> "Optional note (the last build log is attached automatically)"
+                        else -> "Describe your request"
+                    }
                     dialog.dismiss()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
@@ -199,7 +203,27 @@ class ChatFragment : Fragment() {
         }
         executeBtn.setOnClickListener {
             val userRequest = promptInput.text.toString()
-            
+
+            if (requestMode == 5) {
+                val snapshot = com.tom.rv2ide.artificial.agentic.BuildLogCapture.snapshot()
+                when (snapshot.state) {
+                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.FAILED -> {
+                        codeCompletionManager.clearSuggestion()
+                        aiRequestHandler.execute(
+                            com.tom.rv2ide.artificial.agentic.BuildErrors.prompt(snapshot, userRequest),
+                            allowEdits = true,
+                        )
+                    }
+                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.RUNNING ->
+                        showSnackbar("A build is still running. Wait for it to finish.")
+                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.SUCCESS ->
+                        showSnackbar("The last build succeeded. Nothing to fix.")
+                    else ->
+                        showSnackbar("No failed build in this session yet. Run a build first, or paste a log in \"Analyze build error\".")
+                }
+                return@setOnClickListener
+            }
+
             if (userRequest.isBlank()) {
                 showSnackbar("Please enter a request")
                 return@setOnClickListener

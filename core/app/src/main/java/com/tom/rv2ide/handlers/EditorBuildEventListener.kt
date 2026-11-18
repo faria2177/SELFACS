@@ -76,6 +76,7 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   }
 
   override fun prepareBuild(buildInfo: BuildInfo) {
+    com.tom.rv2ide.artificial.agentic.BuildLogCapture.start(buildInfo.tasks.map { it.toString() })
     checkActivity("prepareBuild") ?: return
 
     val isFirstBuild = GeneralPreferences.isFirstBuild
@@ -101,6 +102,7 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   }
 
   override fun onBuildSuccessful(tasks: List<String?>) {
+    com.tom.rv2ide.artificial.agentic.BuildLogCapture.finish(true)
     checkActivity("onBuildSuccessful") ?: return
 
     analyzeCurrentFile()
@@ -120,7 +122,9 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   }
 
   override fun onBuildFailed(tasks: List<String?>) {
+    com.tom.rv2ide.artificial.agentic.BuildLogCapture.finish(false)
     checkActivity("onBuildFailed") ?: return
+    activity.appendBuildOutput("💡 SELFACS AI: open the AI panel and choose the task mode \"Fix last build error\" to get a reviewed fix.")
 
     analyzeCurrentFile()
 
@@ -131,6 +135,7 @@ class EditorBuildEventListener : GradleBuildService.EventListener {
   }
 
   override fun onOutput(line: String?) {
+    line?.let { com.tom.rv2ide.artificial.agentic.BuildLogCapture.append(it) }
     checkActivity("onOutput") ?: return
 
     line?.let { activity.appendBuildOutput(it) }
