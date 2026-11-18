@@ -66,7 +66,7 @@ class GitHubApiClient(private val token: String) {
             val full = item.optString("full_name")
             val parts = full.split('/')
             if (parts.size != 2 || !GitHubValidation.isValidOwnerOrRepo(parts[0]) ||
-                !GitHubValidation.isValidOwnerOrRepo(parts[1])) return@mapNotNull null
+                !GitHubValidation.isValidOwnerOrRepo(parts[1])) return@mapObjects null
             GitHubRepository(
                 parts[0], parts[1], full, item.optString("description").takeUnless { it == "null" }.orEmpty(),
                 item.optBoolean("private"), item.optString("default_branch").ifBlank { "main" },
@@ -79,7 +79,7 @@ class GitHubApiClient(private val token: String) {
         val array = requestArray("/repos/${part(repo.owner)}/${part(repo.name)}/branches?per_page=100")
         return array.mapObjects { item ->
             val name = item.optString("name")
-            if (!GitHubValidation.isValidBranch(name)) return@mapNotNull null
+            if (!GitHubValidation.isValidBranch(name)) return@mapObjects null
             GitHubBranch(name, item.optJSONObject("commit")?.optString("sha").orEmpty())
         }
     }
@@ -89,7 +89,7 @@ class GitHubApiClient(private val token: String) {
             .optJSONArray("workflows") ?: JSONArray()
         return array.mapObjects { item ->
             val id = item.optLong("id")
-            if (id <= 0) return@mapNotNull null
+            if (id <= 0) return@mapObjects null
             GitHubWorkflow(id, item.optString("name"), item.optString("path"), item.optString("state"))
         }
     }
@@ -99,7 +99,7 @@ class GitHubApiClient(private val token: String) {
             .optJSONArray("workflow_runs") ?: JSONArray()
         return array.mapObjects { item ->
             val id = item.optLong("id")
-            if (id <= 0) return@mapNotNull null
+            if (id <= 0) return@mapObjects null
             GitHubRun(
                 id, item.optString("name").ifBlank { "Workflow run" }, item.optString("head_branch"),
                 item.optString("status"), item.optString("conclusion").takeUnless { it == "null" }.orEmpty(),
@@ -113,7 +113,7 @@ class GitHubApiClient(private val token: String) {
             .optJSONArray("artifacts") ?: JSONArray()
         return array.mapObjects { item ->
             val id = item.optLong("id")
-            if (id <= 0) return@mapNotNull null
+            if (id <= 0) return@mapObjects null
             GitHubArtifact(id, item.optString("name"), item.optLong("size_in_bytes"),
                 item.optBoolean("expired"), item.optString("created_at"))
         }
