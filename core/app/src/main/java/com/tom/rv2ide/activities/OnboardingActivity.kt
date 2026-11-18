@@ -126,8 +126,9 @@ class OnboardingActivity : AppIntro2() {
       return
     }
 
+    // SELFACS: no statistics are collected, so the consent slide is not shown.
     if (!StatPreferences.statConsentDialogShown) {
-      addSlide(StatisticsFragment.newInstance(this))
+      StatPreferences.statOptIn = false
       StatPreferences.statConsentDialogShown = true
     }
 

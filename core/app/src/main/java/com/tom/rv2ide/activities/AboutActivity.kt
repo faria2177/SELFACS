@@ -114,8 +114,8 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
     when (action.id) {
       ACTION_WEBSITE -> app.openUrl("https://github.com/faria2177/SELFACS")
       ACTION_EMAIL -> app.emailUs()
-      ACTION_TG_GROUP -> app.openTelegramGroup()
-      ACTION_TG_CHANNEL -> app.openTelegramChannel()
+      ACTION_TG_GROUP -> app.openUrl(BaseApplication.ISSUES_URL)
+      ACTION_TG_CHANNEL -> app.openUrl(BaseApplication.UPSTREAM_URL)
       ACTION_CONTRIBUTE -> app.openUrl(BaseApplication.CONTRIBUTOR_GUIDE_URL)
       ACTION_CONTRIBUTORS -> startActivity(Intent(this, ContributorsActivity::class.java))
     /*ACTION_QQ_GROUP -> {
@@ -139,28 +139,19 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
       add(
           createSimpleIconTextItem(
               this@AboutActivity,
-              ACTION_EMAIL,
-              R.drawable.ic_email,
-              R.string.about_option_email,
-              BaseApplication.EMAIL,
-          )
-      )
-      add(
-          createSimpleIconTextItem(
-              this@AboutActivity,
               ACTION_TG_GROUP,
-              R.drawable.ic_telegram,
-              R.string.discussions_on_telegram,
-              BaseApplication.TELEGRAM_GROUP_URL,
+              R.drawable.ic_github,
+              R.string.selfacs_report_issue,
+              BaseApplication.ISSUES_URL,
           )
       )
       add(
           createSimpleIconTextItem(
               this@AboutActivity,
               ACTION_TG_CHANNEL,
-              R.drawable.ic_telegram,
-              R.string.official_tg_channel,
-              BaseApplication.TELEGRAM_CHANNEL_URL,
+              R.drawable.ic_github,
+              R.string.selfacs_based_on_upstream,
+              BaseApplication.UPSTREAM_URL,
           )
       )
       // add the qq item

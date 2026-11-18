@@ -93,7 +93,9 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [ ] Build status, artifact link ও test evidence এই ফাইলে লিখে রাখা।
 
 ### P1 — Android Code Studio core usability
-- [ ] SELFACS নাম, icon, About, settings ও user-facing strings-এ upstream branding audit।
+- [x] Branding audit (ধাপ ১): সব ভাষার user-facing string-এ "Android Code Studio/AndroidCS/AndroidIDE" → SELFACS (license header ও upstream credit অপরিবর্তিত); About-এ upstream Telegram/email সরিয়ে GitHub Issues ও "Based on Android Code Studio"; Docs/help/crash-report/changelog লিংক SELFACS repo-তে; contributors পাতা upstream-এ (credit)।
+- [x] Privacy: upstream (androidide.com)-এ usage statistics পাঠানো সম্পূর্ণ বন্ধ, আগের scheduled upload বাতিল, onboarding-এ stats slide বাদ, default opt-out।
+- [ ] Branding ধাপ ২: icon/launcher ও screenshots যাচাই (device)।
 - [~] Package/application ID migration — **২০২৬-১১-১৮ সিদ্ধান্ত: আপাতত `com.tom.rv2ide` রাখা হলো।** কারণ: Termux bootstrap-এর ৬৩০টা ফাইলে (৩০৯টা ELF binary) `/data/data/com.tom.rv2ide` prefix compiled; ID বদলালে terminal/JDK/Gradle ভাঙবে। ভবিষ্যৎ বিকল্প: (ক) same-length ID (যেমন `io.selfacs.ide`) + binary prefix patch, (খ) termux-packages দিয়ে নতুন prefix-এ bootstrap ও toolchain rebuild। ID বদলালে বর্তমান install-এ in-app update যাবে না।
 - [ ] Project create/open/import/export এবং file tree workflow বাস্তব ডিভাইসে যাচাই।
 - [ ] Editor tabs, syntax highlighting, search/replace, terminal, diagnostics ও language server integration regression test।

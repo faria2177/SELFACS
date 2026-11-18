@@ -150,7 +150,7 @@ class IDEApplication : TermuxApplication() {
   
   fun showChangelog() {
     val intent = Intent(Intent.ACTION_VIEW)
-    var version = BuildInfo.VERSION_NAME_SIMPLE
+    var version = BuildInfo.VERSION_NAME_SIMPLE.substringBefore('+')
     if (!version.startsWith('v')) {
       version = "v${version}"
     }
@@ -165,6 +165,11 @@ class IDEApplication : TermuxApplication() {
   }
 
   fun reportStatsIfNecessary() {
+    // SELFACS does not send usage statistics. The upstream uploader targets the upstream project's
+    // server, so it is disabled entirely and any previously scheduled upload is cancelled.
+    WorkManager.getInstance(this).cancelUniqueWork(StatUploadWorker.WORKER_WORK_NAME)
+    log.info("Stat collection is disabled in SELFACS.")
+    if (true) return
 
     if (!StatPreferences.statOptIn) {
       log.info("Stat collection is disabled.")

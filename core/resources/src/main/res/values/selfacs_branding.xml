@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="selfacs_report_issue">Report an issue on GitHub</string>
+  <string name="selfacs_based_on_upstream">Based on Android Code Studio (upstream project)</string>
+</resources>

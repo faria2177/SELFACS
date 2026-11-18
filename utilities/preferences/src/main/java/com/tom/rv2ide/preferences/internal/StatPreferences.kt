@@ -32,7 +32,7 @@ object StatPreferences {
     }
 
   var statOptIn: Boolean
-    get() = prefManager.getBoolean(STAT_OPT_IN, true)
+    get() = prefManager.getBoolean(STAT_OPT_IN, false) // SELFACS: off; uploads are disabled
     set(value) {
       prefManager.putBoolean(STAT_OPT_IN, value)
     }

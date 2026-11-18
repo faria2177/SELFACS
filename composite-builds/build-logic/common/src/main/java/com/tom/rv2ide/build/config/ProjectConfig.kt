@@ -26,11 +26,15 @@ object ProjectConfig {
   * https://github.com/AndroidCSOfficial
   */
   const val REPO_HOST = "github.com"
-  const val REPO_OWNER = "AndroidCSOfficial"
-  const val REPO_NAME = "android-code-studio"
+  const val REPO_OWNER = "faria2177"
+  const val REPO_NAME = "SELFACS"
+
+  /** Upstream project (attribution, contributors, build-system packages). */
+  const val UPSTREAM_OWNER = "AndroidCSOfficial"
+  const val UPSTREAM_NAME = "android-code-studio"
 
   const val ACS_BUILD_SYSTEM_REPONAME = "acs-build-system"
-  const val ACS_BUILD_SYSTEM_REPOURL = "https://$REPO_HOST/$REPO_OWNER/$ACS_BUILD_SYSTEM_REPONAME"
+  const val ACS_BUILD_SYSTEM_REPOURL = "https://$REPO_HOST/$UPSTREAM_OWNER/$ACS_BUILD_SYSTEM_REPONAME"
   
   const val REPO_URL = "https://$REPO_HOST/$REPO_OWNER/$REPO_NAME"
   const val SCM_GIT =

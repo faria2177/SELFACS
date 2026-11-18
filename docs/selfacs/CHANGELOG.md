@@ -2,6 +2,8 @@
 
 ## Next
 
+- SELFACS branding across the app (all languages). About now links to SELFACS GitHub issues and credits the upstream Android Code Studio project.
+- Privacy: usage statistics are no longer sent to the upstream project's server (disabled entirely).
 - AI panel: History button keeps your requests and answers per project (stored privately on the device, not in the project). The last answer is shown again when you reopen the editor.
 - Fixed: in-app update download stopped with "Animators may only be run on Looper threads".
 - AI panel: new "Fix last build error" mode uses the last failed build automatically (no pasting), reads the affected files and proposes a fix for review.

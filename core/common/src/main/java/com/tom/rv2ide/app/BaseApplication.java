@@ -37,13 +37,15 @@ import java.util.concurrent.TimeUnit;
 public class BaseApplication extends Application {
 
   public static final String NOTIFICATION_GRADLE_BUILD_SERVICE = "17571";
-  public static final String TELEGRAM_GROUP_URL = "https://t.me/acs_x";
-  public static final String TELEGRAM_CHANNEL_URL = "https://t.me/rv2ide";  
+  // SELFACS: support goes through GitHub; upstream Telegram/email are not SELFACS channels.
+  public static final String ISSUES_URL = BuildInfo.REPO_URL + "/issues";
+  public static final String UPSTREAM_URL = "https://github.com/AndroidCSOfficial/android-code-studio";
+  public static final String TELEGRAM_GROUP_URL = ISSUES_URL;
+  public static final String TELEGRAM_CHANNEL_URL = BuildInfo.REPO_URL + "/releases";
   public static final String SPONSOR_URL = BuildInfo.REPO_URL;
-  public static final String DOCS_URL = "https://docs.androidide.com";
-  public static final String CONTRIBUTOR_GUIDE_URL =
-      BuildInfo.REPO_URL + "/blob/dev/docs/en/CONTRIBUTING.md";
-  public static final String EMAIL = "rv2.code.studio@gmail.com";
+  public static final String DOCS_URL = BuildInfo.REPO_URL + "#readme";
+  public static final String CONTRIBUTOR_GUIDE_URL = BuildInfo.REPO_URL + "#readme";
+  public static final String EMAIL = ISSUES_URL;
   
   private static BaseApplication instance;
   private PreferenceManager mPrefsManager;
@@ -203,7 +205,7 @@ public class BaseApplication extends Application {
   }
 
   public void emailUs() {
-    openUrl("mailto:" + EMAIL);
+    openUrl(ISSUES_URL);
   }
 
   public void openUrl(String url) {
@@ -211,7 +213,7 @@ public class BaseApplication extends Application {
   }
 
   public void openTelegram(String url) {
-    openUrl(url, "org.telegram.messenger");
+    openUrl(url, null);
   }
 
   public void openUrl(String url, String pkg) {
