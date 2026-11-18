@@ -2,6 +2,7 @@
 
 ## Next
 
+- AI errors now show the provider's real message (for example OpenRouter privacy/data-policy or unknown model) with a hint, instead of a generic "check your API key". Requests that cannot succeed are not retried.
 - Fixed: update check failing with "GitHub rate limit reached" on mobile networks. The app now reads a static update feed and only falls back to the GitHub API.
 - Fixed: Android projects failed to sync with "Null extracted folder for artifact logger-runtime.aar". The logger runtime is now bundled, and it is never injected when unavailable.
 - SELFACS branding across the app (all languages). About now links to SELFACS GitHub issues and credits the upstream Android Code Studio project.

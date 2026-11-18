@@ -110,7 +110,9 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [x] Agent ধাপ ২খ: fix apply হলে user অনুমতিতে একই Gradle task আবার চালানো (শুধু সাধারণ task নাম, কোনো arbitrary command নয়); fail করলে অনুমতি নিয়ে নতুন error দিয়ে আবার fix — সর্বোচ্চ ৩ বার। Fix-এর আগে open editor save, rebuild-এর আগে নয় (AI-এর পরিবর্তন যেন stale buffer-এ না মোছে)।
 - [x] Agent ধাপ ৩ক: project-ভিত্তিক AI history (app-private storage, সর্বোচ্চ ৫০টি, project ফোল্ডারে নয়); History বোতাম, পুরোনো request আবার ব্যবহার, history মুছে ফেলা; app খুললে শেষ উত্তর দেখায়। `AIChatHistoryTest`।
 - [x] Updater fix (v0.1.5): download progress UI main thread-এ।
-- [ ] Agent ধাপ ৩খ: streaming response।
+- [x] Device bug: OpenRouter-এ "Failed after 2 attempts… check your API key" — আসল কারণ লুকানো ছিল। Fix: provider-এর error message (key মুছে) দেখানো, 404/400 ইত্যাদি retry না করা, শেষ error সহ বার্তা, সাধারণ সমস্যায় সমাধানের ইঙ্গিত (OpenRouter privacy/data policy, ভুল model ID, context বড়)। Reasoning-only/empty উত্তর আলাদা করে চেনা।
+- [x] Device: logger fix কাজ করেছে — `Bulk_SMS_Sender_Pro` "CONFIGURE SUCCESSFUL"।
+- [ ] Agent ধাপ ৩খ: streaming response; rate limit-এ Retry-After অনুযায়ী অপেক্ষা ও পুনরায় চেষ্টা।
 - [ ] প্রতিটি provider-এর real connection test ও model compatibility matrix।
 - [ ] Streaming response, timeout, retry, rate-limit/quota এবং network error handling।
 - [ ] Provider/model selector ও usage/error status UX উন্নত করা।

@@ -25,3 +25,6 @@ class RateLimitException(message: String) : Exception(message)
 class QuotaExceededException(message: String) : Exception(message)
 class InsufficientBalanceException(message: String) : Exception(message)
 class InvalidApiKeyException(message: String) : Exception(message)
+
+/** Provider rejected the request for a reason a retry cannot fix (unknown model, bad request, data policy). */
+class NonRetryableProviderException(message: String) : Exception(message)

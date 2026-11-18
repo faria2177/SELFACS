@@ -150,6 +150,7 @@ class AIAgentManager(private val context: Context) {
 
     private suspend fun executeLocked(userRequest: String, callback: AIAgentCallback, allowEdits: Boolean) {
         var success = false
+        var lastError: Throwable? = null
         var providerSwitched = false
 
         if (currentAgent?.isInitialized() != true) {
@@ -206,6 +207,7 @@ class AIAgentManager(private val context: Context) {
                     },
                   onFailure = { error ->
                       if (error is CancellationException) throw error
+                      lastError = error
                       android.util.Log.e("AIAgentManager", "Error occurred: ${error.message}", error)
                       
                       val shouldSwitchProvider = error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
@@ -245,6 +247,10 @@ class AIAgentManager(private val context: Context) {
                               callback.onError("PROVIDER_SWITCH_REQUIRED::$errorDisplay")
                               success = true
                           }
+                      } else if (error is com.tom.rv2ide.artificial.exceptions.NonRetryableProviderException) {
+                          // Retrying the same request cannot help (unknown model, data policy, bad request).
+                          callback.onError(formatErrorMessage(error))
+                          success = true
                       } else if ((currentAgent?.canRetry() == true) && !providerSwitched) {
                           callback.onRetry(
                               currentAgent?.getCurrentAttemptCount() ?: 0,
@@ -261,6 +267,7 @@ class AIAgentManager(private val context: Context) {
                 )
             } catch (e: CancellationException) { throw e }
               catch (e: Exception) {
+                lastError = e
                 if (success) { callback.onError("Operation interrupted. Inspect any already applied files."); return }
                 android.util.Log.e("AIAgentManager", "Exception occurred: ${e.message}", e)
                 
@@ -282,7 +289,8 @@ class AIAgentManager(private val context: Context) {
         if (!success) {
           val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
           val agentName = currentAgent?.providerName ?: "No agent initialized"
-          callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and try again.")
+          val detail = lastError?.let { "\n\n" + formatErrorMessage(it) } ?: "\n\nPlease check your API key and model, then try again."
+          callback.onError("Failed after $attemptCount attempts with $agentName.$detail")
         }
     }
 
@@ -356,6 +364,20 @@ class AIAgentManager(private val context: Context) {
         return results
     }
 
+    /** Plain-language next step for common provider errors. */
+    private fun providerHint(message: String): String {
+        val m = message.lowercase()
+        return when {
+            "data policy" in m || "no endpoints found" in m || "privacy" in m ->
+                "\n\nFix: on openrouter.ai open Settings → Privacy and allow the providers/training policy required by free models, or choose another model."
+            "not a valid model" in m || "model not found" in m || "(404)" in m ->
+                "\n\nFix: check the exact model ID (including any :free suffix) on the provider's models page."
+            "context" in m && ("length" in m || "too long" in m || "maximum" in m) ->
+                "\n\nFix: the request is too large for this model. Use a model with a larger context window."
+            else -> ""
+        }
+    }
+
     private fun formatErrorMessage(error: Throwable): String {
         val errorMessage = error.message ?: "Unknown error occurred"
         val stackTrace = error.stackTraceToString().take(500)
@@ -374,6 +396,10 @@ class AIAgentManager(private val context: Context) {
                 "🌐 NETWORK ERROR\n\nCould not connect to the API server.\nPlease check your internet connection.\n\nDetails: $errorMessage"
             is java.net.SocketTimeoutException ->
                 "⏱️ TIMEOUT ERROR\n\nThe request took too long to complete.\nPlease try again.\n\nDetails: $errorMessage"
+            is com.tom.rv2ide.artificial.exceptions.NonRetryableProviderException ->
+                "❌ REQUEST REJECTED BY $providerName\n\n$errorMessage" + providerHint(errorMessage)
+            is IllegalStateException ->
+                "❌ $providerName ERROR\n\n$errorMessage" + providerHint(errorMessage)
             is org.json.JSONException ->
                 "📄 JSON PARSING ERROR\n\nFailed to parse API response.\nThe API may be experiencing issues.\n\nDetails: $errorMessage"
             else -> 
