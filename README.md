@@ -4,7 +4,7 @@ SELFACS is an independent Android mobile IDE based on [Android Code Studio](http
 
 ## Project status
 
-Bootstrap stage. The upstream Android source has not yet been imported or built. The repository will use a pinned upstream snapshot, preserving license, attribution, modules, native binaries and submodules.
+Pinned upstream source imported. APK build and device validation are separate milestones. The repository will use a pinned upstream snapshot, preserving license, attribution, modules, native binaries and submodules.
 
 - Upstream branch: `dev`
 - Upstream snapshot: `24cf7fe1133c35ca3e18a8e30128435482e07709`
