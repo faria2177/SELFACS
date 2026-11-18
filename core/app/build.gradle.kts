@@ -76,16 +76,17 @@ android {
 
   signingConfigs {
       create("custom") {
-          val keyStorePath = "${rootProject.projectDir}/signing/signing-key.jks"
-          val keyStoreFile = file(keyStorePath)
-          
-          val signing_storePassword = System.getProperty("SIGNING_STORE_PASSWORD") ?: ""
-          val signing_keyPassword = System.getProperty("SIGNING_KEY_PASSWORD") ?: ""
-                    
+          // Release signing comes only from CI secrets/env; no key is stored in the repository.
+          val keyStoreFile = file(
+              System.getenv("SIGNING_STORE_FILE")
+                  ?: "${rootProject.projectDir}/signing/signing-key.jks"
+          )
           storeFile = keyStoreFile
-          storePassword = signing_storePassword
-          keyAlias = "androidcs"
-          keyPassword = signing_keyPassword
+          storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+              ?: System.getProperty("SIGNING_STORE_PASSWORD") ?: ""
+          keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "androidcs"
+          keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+              ?: System.getProperty("SIGNING_KEY_PASSWORD") ?: ""
       }
   }
 

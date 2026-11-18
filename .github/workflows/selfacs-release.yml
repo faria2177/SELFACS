@@ -1,0 +1,158 @@
+name: SELFACS signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        default: true
+      dry_run:
+        description: "Build with a temporary key and do not publish (tests the release build)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: selfacs-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Install required Android SDK
+        run: |
+          set -euo pipefail
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdk" --licenses > /dev/null || true
+          "$sdk" 'platforms;android-37.0' || "$sdk" 'platforms;android-37'
+          cd "$ANDROID_HOME/platforms"
+          if [ ! -d android-37 ] && [ -d android-37.0 ]; then ln -s android-37.0 android-37; fi
+          test -f android-37/android.jar
+      - name: Prepare upstream build directories
+        run: |
+          mkdir -p core/app/build/intermediates/external_file_lib_dex_archives/{debug/desugarDebugFileDependencies,release/desugarReleaseFileDependencies}
+          mkdir -p core/app/build/intermediates/l8_art_profile/release/l8DexDesugarLibRelease
+          mkdir -p composite-builds/build-logic/desugaring-core
+          touch core/app/build/intermediates/l8_art_profile/release/l8DexDesugarLibRelease/baseline-prof.txt
+          chmod +x gradlew
+      - name: Build upstream editor dependency
+        run: |
+          set -euo pipefail
+          git init "$RUNNER_TEMP/sora-editor"
+          git -C "$RUNNER_TEMP/sora-editor" fetch --depth=1 https://github.com/nullij/sora-editor.git aa46c19fe01e0721959d308fe2a5df408592f1a4
+          git -C "$RUNNER_TEMP/sora-editor" checkout --detach FETCH_HEAD
+          cat > "$RUNNER_TEMP/no-sign.init.gradle" <<'EOF'
+          gradle.projectsEvaluated {
+            rootProject.allprojects { p ->
+              def s = p.extensions.findByName("signing")
+              if (s != null) s.required = false
+            }
+          }
+          EOF
+          (
+            cd "$RUNNER_TEMP/sora-editor"
+            v=build-logic/convention/src/main/kotlin/Versions.kt
+            sed -i 's/private const val version = "0.24.6"/private const val version = "0.24.7-acs"/' "$v"
+            sed -i 's/const val versionCode = 95/const val versionCode = 96/' "$v"
+            chmod +x gradlew
+            ./gradlew :editor:publishToMavenLocal -I "$RUNNER_TEMP/no-sign.init.gradle" --stacktrace
+          )
+          find . -name libs.versions.toml -not -path '*/build/*' -exec sed -i 's/^\(editor = \)"0.24.7-acs"/\1"0.24.7-acs-SNAPSHOT"/' {} +
+      - name: Prepare signing key
+        env:
+          KS_B64: ${{ secrets.SELFACS_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.SELFACS_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.SELFACS_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SELFACS_KEY_ALIAS }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ks="$RUNNER_TEMP/selfacs-release.jks"
+          if [ "$DRY_RUN" = "true" ]; then
+            p=$(openssl rand -hex 16)
+            keytool -genkeypair -storetype PKCS12 -keystore "$ks" -alias dryrun -keyalg RSA -keysize 2048 \
+              -validity 1 -storepass "$p" -keypass "$p" -dname "CN=SELFACS dry run" >/dev/null
+            KS_PASS="$p"; KEY_PASS="$p"; KEY_ALIAS=dryrun
+          else
+            if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ] || [ -z "$KEY_PASS" ] || [ -z "$KEY_ALIAS" ]; then
+              echo "::error::Signing secrets missing: SELFACS_KEYSTORE_BASE64, SELFACS_KEYSTORE_PASSWORD, SELFACS_KEY_PASSWORD, SELFACS_KEY_ALIAS"
+              exit 1
+            fi
+            printf '%s' "$KS_B64" | base64 -d > "$ks"
+          fi
+          echo "::add-mask::$KS_PASS"
+          echo "::add-mask::$KEY_PASS"
+          {
+            echo "SIGNING_STORE_FILE=$ks"
+            echo "SIGNING_STORE_PASSWORD=$KS_PASS"
+            echo "SIGNING_KEY_PASSWORD=$KEY_PASS"
+            echo "SIGNING_KEY_ALIAS=$KEY_ALIAS"
+          } >> "$GITHUB_ENV"
+      - name: Assemble release APK
+        run: ./gradlew :core:app:assembleRelease --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
+      - name: Verify signatures and rename
+        id: apks
+        run: |
+          set -euo pipefail
+          bt=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)
+          signer="$ANDROID_HOME/build-tools/$bt/apksigner"
+          mkdir -p out
+          ls -la core/app/build/outputs/apk/release/
+          for f in core/app/build/outputs/apk/release/*.apk; do
+            "$signer" verify --print-certs "$f" | grep -E "Signer #1 certificate (DN|SHA-256)"
+            abi=""
+            for a in arm64-v8a armeabi-v7a x86_64 x86 universal; do
+              case "$(basename "$f")" in *"$a"*) abi="$a"; break;; esac
+            done
+            [ -n "$abi" ] || abi=universal
+            cp "$f" "out/selfacs-${abi}-release.apk"
+          done
+          (cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Upload release APKs (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SELFACS-release-apks
+          path: out/*
+          if-no-files-found: error
+      - name: Publish GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          PRE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          cat > notes.md <<EOF
+          SELFACS signed release build.
+
+          - Source commit: \`$sha\`
+          - CI run: https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID
+          - Signed with the SELFACS release key. A debug build installed earlier must be uninstalled first (different signature).
+          - Device testing is still in progress; see project.md for verification status.
+          EOF
+          flag=""; [ "$PRE" = "true" ] && flag="--prerelease"
+          gh release create "$TAG" out/*.apk out/SHA256SUMS.txt --target "$sha" $flag \
+            --title "SELFACS $TAG" --notes-file notes.md
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/selfacs-release.jks"

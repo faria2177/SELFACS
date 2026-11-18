@@ -111,3 +111,9 @@ build.log
 external/logwire/build
 external/atc/build
 external/acsprovider/build
+
+# SELFACS signing — never commit keys
+*.jks
+*.keystore
+signing/
+*.b64
