@@ -19,6 +19,7 @@ package com.tom.rv2ide.artificial.permissions
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.io.File
 
 /*
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null

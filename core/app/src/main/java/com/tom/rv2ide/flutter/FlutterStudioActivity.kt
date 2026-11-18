@@ -43,7 +43,7 @@ class FlutterStudioActivity : AppCompatActivity() {
         pendingExportProject = null
         if (uri != null && name != null) runTask("Exporting ZIP…", {
             val folder = FlutterWorkspace.safeTarget(root, name)
-            contentResolver.openOutputStream(uri, "wt")?.use { FlutterWorkspace.exportZip(folder, it) }
+            contentResolver.openOutputStream(uri, "w")?.use { FlutterWorkspace.exportZip(folder, it) }
                 ?: error("Cannot write ZIP")
         }) { status.text = "ZIP exported. Extract and upload to your GitHub repository." }
     }
@@ -93,7 +93,7 @@ class FlutterStudioActivity : AppCompatActivity() {
         content.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(commands) })
         fileLabel = TextView(this).apply { text = "No file open"; setPadding(16, 8, 16, 8) }
         content.addView(fileLabel)
-        editor = CodeEditor(this).apply { setText(""); isEnabled = false }
+        editor = CodeEditor(this).apply { setText(""); setEditable(false) }
         content.addView(editor, LinearLayout.LayoutParams(-1, 0, 1f))
         status = TextView(this).apply { text = "Create, open or import a Flutter project."; setPadding(16, 12, 16, 12) }
         content.addView(status)
@@ -109,7 +109,7 @@ class FlutterStudioActivity : AppCompatActivity() {
             if (folder != null) {
                 project = folder
                 toolbar.subtitle = folder.name
-                val path = savedInstanceState.getString("relative")
+                val path = savedInstanceState?.getString("relative")
                 if (path != null) openFile(path)
             }
         }
@@ -149,7 +149,7 @@ class FlutterStudioActivity : AppCompatActivity() {
         relative = null
         baseline = null
         editor.setText("")
-        editor.isEnabled = false
+        editor.setEditable(false)
         toolbar.subtitle = folder.name
         fileLabel.text = "No file open"
         if (File(folder, "lib/main.dart").isFile) openFile("lib/main.dart") else chooseFile()
@@ -168,7 +168,7 @@ class FlutterStudioActivity : AppCompatActivity() {
             relative = path
             baseline = text
             editor.setText(text)
-            editor.isEnabled = true
+            editor.setEditable(true)
             fileLabel.text = path
             status.text = "Editing $path"
         }
@@ -215,18 +215,18 @@ class FlutterStudioActivity : AppCompatActivity() {
     private fun <T> runTask(label: String, work: () -> T, done: (T) -> Unit) {
         if (busy) return
         busy = true
-        editor.isEnabled = false
+        editor.setEditable(false)
         status.text = label
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) { work() }
                 busy = false
-                editor.isEnabled = relative != null
+                editor.setEditable(relative != null)
                 done(result)
             } catch (e: CancellationException) { throw e }
               catch (e: Exception) {
                 busy = false
-                editor.isEnabled = relative != null
+                editor.setEditable(relative != null)
                 status.text = e.message ?: "Operation failed"
                 message(status.text.toString())
             }
