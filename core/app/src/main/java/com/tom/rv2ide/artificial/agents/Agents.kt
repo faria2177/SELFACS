@@ -25,7 +25,7 @@ import android.preference.PreferenceManager
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 
-class Agents(ctx: Context) {
+class Agents(private val ctx: Context) {
 
   private val sp: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(ctx)
   private val AGENT_KEY = "ai_agent_model_name"
@@ -147,6 +147,9 @@ class Agents(ctx: Context) {
   val ai_agents = openai_models + claude_models + gemini_models + deepseek_models + grok_models + localllm_models
   
   fun getModelsForProvider(providerId: String): Array<String> {
+    if (com.tom.rv2ide.artificial.agents.compatible.CloudProviders.find(providerId) != null) {
+      return com.tom.rv2ide.artificial.agents.compatible.CloudProviders.get(ctx, providerId)?.model?.let { arrayOf(it) } ?: emptyArray()
+    }
     return when(providerId) {
       "openai" -> openai_models
       "gemini" -> gemini_models
@@ -171,7 +174,9 @@ class Agents(ctx: Context) {
   }
   
   fun setAgent(name: String) {
+      val configuredProvider = getProvider()
       val provider = when {
+          com.tom.rv2ide.artificial.agents.compatible.CloudProviders.find(configuredProvider) != null && name in getModelsForProvider(configuredProvider) -> configuredProvider
           name in openai_models -> "openai"
           name in gemini_models -> "gemini"
           name in claude_models -> "claude"
@@ -185,15 +190,20 @@ class Agents(ctx: Context) {
   }
   
   fun getAgent(): String {
+    val provider = getProvider()
+    if (com.tom.rv2ide.artificial.agents.compatible.CloudProviders.find(provider) != null) {
+      return getModelsForProvider(provider).firstOrNull() ?: ""
+    }
     val savedModel = sp.getString(AGENT_KEY, null)
-    if (savedModel != null) return savedModel
+    if (savedModel != null && isValidModelForProvider(savedModel, provider)) return savedModel
     
     return when (getProvider()) {
       "openai" -> "gpt-4o"
       "gemini" -> "gemini-2.5-pro"
       "claude" -> "claude-sonnet-4-20250514"
       "deepseek" -> "deepseek-chat"
-      "grok" -> "grok-beta"
+      "grok" -> grok_models.first()
+      "localllm" -> localllm_models.first()
       else -> "gemini-2.5-pro"
     }
   }

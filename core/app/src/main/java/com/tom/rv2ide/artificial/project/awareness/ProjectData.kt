@@ -30,15 +30,23 @@ class ProjectData(ctx: Context) {
     fun showProjectTree(proj: File): ProjectTreeResult {
         val sb = StringBuilder()
     
+        val base = proj.canonicalFile
+        var entries = 0
         fun walk(dir: File) {
+            if (entries >= 12000) return
             sb.appendLine(dir.canonicalPath)
+            entries++
             dir.listFiles()?.forEach { file ->
+                if (entries >= 12000) return@forEach
+                if (file.name.startsWith(".") || file.name in setOf("build", "node_modules", "signing")) return@forEach
+                val canonical = runCatching { file.canonicalFile }.getOrNull() ?: return@forEach
+                if (canonical.path != file.absolutePath || !canonical.path.startsWith(base.path + File.separator)) return@forEach
                 if (file.isDirectory) walk(file)
-                else sb.appendLine(file.canonicalPath)
+                else { sb.appendLine(canonical.path); entries++ }
             }
         }
     
-        walk(proj)
+        walk(base)
     
         return ProjectTreeResult(sb.toString(), proj)
     }
@@ -48,6 +56,7 @@ class ProjectTreeResult(
     val tree: String,
     private val root: File
 ) {
+    val projectRoot: File get() = root
 
     fun getFileByName(filename: String): String? {
 

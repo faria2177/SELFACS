@@ -140,9 +140,13 @@ class AIPermissionManager(private val context: Context) {
         val allowedDirs = getAllowedDirectories()
         if (allowedDirs.isEmpty()) return false
         
-        return allowedDirs.any { allowedDir ->
-            filePath.startsWith(allowedDir)
-        }
+        return try {
+            val candidate = File(filePath).canonicalFile
+            allowedDirs.any { allowedDir ->
+                val base = File(allowedDir).canonicalFile
+                candidate.path.startsWith(base.path + File.separator)
+            }
+        } catch (_: Exception) { false }
     }
 
     /**

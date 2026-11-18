@@ -13,3 +13,10 @@
 - Local read-only toolchain inventory with a Manage tools shortcut.
 - Fix recycled action long-click state.
 - About website points to SELFACS; upstream toolchain endpoints stay intact.
+
+## Additional AI providers
+
+- Groq, OpenRouter, Z.AI/GLM and Alibaba Qwen use an OpenAI-compatible HTTP transport and user-entered model IDs.
+- Configure from editor AI Settings. New provider credentials are encrypted via Android Keystore-backed storage. No API keys or live requests are bundled.
+- Scope new provider file writes to the current project; use bounded source context, basic secret filtering, no redirect credential forwarding. Filtering is heuristic, not a guarantee against secret exposure.
+- Existing provider credentials retain upstream storage; summaries are masked. Live provider and APK validation still pending.

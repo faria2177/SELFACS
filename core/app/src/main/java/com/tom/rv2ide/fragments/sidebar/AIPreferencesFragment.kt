@@ -22,6 +22,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.tom.rv2ide.artificial.dialogs.LocalLLMConfigDialog
+import com.tom.rv2ide.artificial.agents.compatible.CloudProviders
+import com.tom.rv2ide.artificial.dialogs.CloudProviderConfigDialog
 
 class AIPreferencesFragment(
     private val aiAgent: AIAgentManager,
@@ -90,9 +92,9 @@ class AIPreferencesFragment(
             "deepseek" to "DeepSeek",
             "grok" to "xAI Grok",
             "localllm" to "Local LLM"
-        )
+        ) + CloudProviders.all.associate { it.id to it.name }
         
-        val allProviderIds = listOf("gemini", "openai", "claude", "deepseek", "grok", "localllm")
+        val allProviderIds = listOf("gemini", "openai", "claude", "deepseek", "grok", "localllm") + CloudProviders.all.map { it.id }
         val providerNames = allProviderIds.map { providerMap[it] ?: it }
         
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, providerNames)
@@ -106,6 +108,11 @@ class AIPreferencesFragment(
             
             if (selectedProviderId == "localllm") {
                 showLocalLLMConfigDialog(selectedProviderName)
+            } else if (CloudProviders.find(selectedProviderId) != null) {
+                CloudProviderConfigDialog.show(requireContext(), CloudProviders.find(selectedProviderId)!!) {
+                    handleProviderChange(selectedProviderId, selectedProviderName)
+                }
+                updateProviderDropdownSelection()
             } else {
                 handleProviderChange(selectedProviderId, selectedProviderName)
             }
@@ -127,7 +134,7 @@ class AIPreferencesFragment(
             "deepseek" to "DeepSeek",
             "grok" to "xAI Grok",
             "localllm" to "Local LLM"
-        )
+        ) + CloudProviders.all.associate { it.id to it.name }
         
         val currentProviderId = agents.getProvider()
         val currentProviderName = providerMap[currentProviderId] ?: currentProviderId
@@ -147,7 +154,7 @@ class AIPreferencesFragment(
             "deepseek" -> "DeepSeek"
             "grok" -> "xAI Grok"
             "localllm" -> "Local LLM"
-            else -> currentProvider.uppercase()
+            else -> CloudProviders.find(currentProvider)?.name ?: currentProvider.uppercase()
         }
         
         currentProviderText.text = providerDisplayName
@@ -277,20 +284,9 @@ class AIPreferencesFragment(
     private fun handleProviderChange(providerId: String, providerName: String) {
         android.util.Log.d("AIPreferences", "Switching to provider: $providerId")
         
-        val availableModels = agents.getModelsForProvider(providerId)
-        android.util.Log.d("AIPreferences", "Available models for $providerId: ${availableModels.joinToString()}")
-        
-        if (availableModels.isNotEmpty()) {
-            val defaultModel = availableModels[0]
-            agents.setAgent(defaultModel)
-            android.util.Log.d("AIPreferences", "Set default model: $defaultModel")
-        }
-        
-        agents.setProvider(providerId)
-        
-        updateModelDropdown()
-        
         if (aiAgent.setProvider(providerId)) {
+            updateProviderDropdownSelection()
+            updateModelDropdown()
             aiAgent.reinitializeWithSelectedModel()
             updateCurrentStatus()
             
@@ -304,7 +300,9 @@ class AIPreferencesFragment(
             
             showSnackbar("Switched to $providerName")
         } else {
-            showSnackbar("⚠️ No valid API key for $providerName")
+            updateProviderDropdownSelection()
+            updateModelDropdown()
+            showSnackbar("⚠️ No configured API key/model for $providerName")
         }
     }
 

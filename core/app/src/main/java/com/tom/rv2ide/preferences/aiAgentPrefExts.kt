@@ -126,6 +126,7 @@ private class GrokApiKey(
     val context = preference.context
 
     val editText = android.widget.EditText(context)
+    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
     editText.setText(prefManager.getString("ai_agent_grok_api_key", ""))
     editText.hint = "Enter your xAI Grok API key"
 
@@ -153,7 +154,7 @@ private class GrokApiKey(
 
   private fun getSummaryText(): String {
     val apiKey = prefManager.getString("ai_agent_grok_api_key", "")
-    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
+    return if (apiKey.isBlank()) "Click to set API key" else "API key configured"
   }
 }
 
@@ -180,6 +181,7 @@ private class GeminiApiKey(
     val context = preference.context
 
     val editText = android.widget.EditText(context)
+    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
     editText.setText(prefManager.getString("ai_agent_gemini_api_key", ""))
     editText.hint = "Enter your Google Gemini API key"
 
@@ -207,7 +209,7 @@ private class GeminiApiKey(
 
   private fun getSummaryText(): String {
     val apiKey = prefManager.getString("ai_agent_gemini_api_key", "")
-    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
+    return if (apiKey.isBlank()) "Click to set API key" else "API key configured"
   }
 }
 
@@ -234,6 +236,7 @@ private class DeepseekApiKey(
     val context = preference.context
 
     val editText = android.widget.EditText(context)
+    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
     editText.setText(prefManager.getString("ai_agent_deepseek_api_key", ""))
     editText.hint = "Enter your Deepseek API key"
 
@@ -261,7 +264,7 @@ private class DeepseekApiKey(
 
   private fun getSummaryText(): String {
     val apiKey = prefManager.getString("ai_agent_deepseek_api_key", "")
-    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
+    return if (apiKey.isBlank()) "Click to set API key" else "API key configured"
   }
 }
 
@@ -288,6 +291,7 @@ private class OpenAIApiKey(
     val context = preference.context
 
     val editText = android.widget.EditText(context)
+    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
     editText.setText(prefManager.getString("ai_agent_openai_api_key", ""))
     editText.hint = "Enter your OpenAI API key"
 
@@ -315,7 +319,7 @@ private class OpenAIApiKey(
 
   private fun getSummaryText(): String {
     val apiKey = prefManager.getString("ai_agent_openai_api_key", "")
-    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
+    return if (apiKey.isBlank()) "Click to set API key" else "API key configured"
   }
 }
 
@@ -342,6 +346,7 @@ private class AnthropicApiKey(
     val context = preference.context
 
     val editText = android.widget.EditText(context)
+    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
     editText.setText(prefManager.getString("ai_agent_anthropic_api_key", ""))
     editText.hint = "Enter your Anthropic API key"
 
@@ -369,6 +374,6 @@ private class AnthropicApiKey(
 
   private fun getSummaryText(): String {
     val apiKey = prefManager.getString("ai_agent_anthropic_api_key", "")
-    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
+    return if (apiKey.isBlank()) "Click to set API key" else "API key configured"
   }
 }

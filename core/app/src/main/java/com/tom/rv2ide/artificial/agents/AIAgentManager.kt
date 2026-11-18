@@ -42,7 +42,7 @@ class AIAgentManager(private val context: Context) {
     private val snippetParser = SnippetParser()
     private val permissionManager = AIPermissionManager(context)
     private var currentProjectRoot: File? = null
-    private var currentProviderId: String = "gemini"
+    private var currentProviderId: String = Agents(context).getProvider()
     private var currentAgent: AIAgent? = null
     private val providerSwitchDialog = ProviderSwitchDialog(context)
 
@@ -53,6 +53,7 @@ class AIAgentManager(private val context: Context) {
         Grok.registerAgent()
         DeepSeek.registerAgent()
         LocalLLM.registerAgent()
+        com.tom.rv2ide.artificial.agents.compatible.CloudProviders.register(context)
         
         permissionManager.setFileWriteEnabled(true)
         permissionManager.setRequireConfirmation(false)
@@ -76,25 +77,18 @@ class AIAgentManager(private val context: Context) {
             return false
         }
         
+        val candidate = factory.create(context)
+        val apiKey = factory.getApiKey() ?: return false
+        try {
+            candidate.initialize(apiKey, context)
+            candidate.setContext(context)
+            currentProjectRoot?.let { root -> candidate.setProjectData(ProjectData(context).showProjectTree(root)) }
+        } catch (_: Exception) { return false }
+        if (!candidate.isInitialized()) return false
         currentProviderId = providerId
-        currentAgent = factory.create(context)
-        android.util.Log.d("AIAgentManager", "Agent created: ${currentAgent != null}")
-        
-        factory.getApiKey()?.let { apiKey ->
-            android.util.Log.d("AIAgentManager", "Initializing agent with API key")
-            currentAgent?.initialize(apiKey, context)
-            currentAgent?.setContext(context)
-            
-            currentProjectRoot?.let { root ->
-                val projectData = ProjectData(context)
-                val projectTree = projectData.showProjectTree(root)
-                currentAgent?.setProjectData(projectTree)
-            }
-            
-            android.util.Log.d("AIAgentManager", "Agent initialized: ${currentAgent?.isInitialized()}")
-        }
-        
-        return currentAgent?.isInitialized() ?: false
+        currentAgent = candidate
+        Agents(context).setProvider(providerId)
+        return true
     }
 
     fun getCurrentProviderId(): String = currentProviderId
@@ -139,6 +133,10 @@ class AIAgentManager(private val context: Context) {
         var success = false
         var providerSwitched = false
 
+        if (currentAgent?.isInitialized() != true) {
+            callback.onError("Configure an AI provider and model in AI Settings before sending a request.")
+            return
+        }
         currentAgent?.resetAttemptCount()
         callback.onProcessing("Analyzing your request...")
 
@@ -277,7 +275,6 @@ class AIAgentManager(private val context: Context) {
           val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
           val agentName = currentAgent?.providerName ?: "No agent initialized"
           callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and try again.")
-          undoLastModification()
         }
     }
 
