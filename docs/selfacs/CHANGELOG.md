@@ -2,6 +2,8 @@
 
 ## Next
 
+- AI panel: History button keeps your requests and answers per project (stored privately on the device, not in the project). The last answer is shown again when you reopen the editor.
+- Fixed: in-app update download stopped with "Animators may only be run on Looper threads".
 - AI panel: new "Fix last build error" mode uses the last failed build automatically (no pasting), reads the affected files and proposes a fix for review.
 - After an approved fix, SELFACS offers to rebuild the same task; if it still fails, the AI can try again with the new errors (up to 3 attempts, each step needs your approval).
 

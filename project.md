@@ -105,7 +105,9 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [x] Agent tools (ধাপ ১): AI নিজে `READ_FILE` / `LIST_DIR` / `SEARCH` দিয়ে project থেকে তথ্য নেয়, সর্বোচ্চ ৬ round, read-only; path project-এ সীমিত, hidden/build/secret ফাইল বাদ; edit-এর আগে ফাইল পড়ার নিয়ম। `AgentToolsTest`।
 - [x] Agent ধাপ ২ক: শেষ Gradle build-এর output memory-তে রাখা (bounded, secrets redacted); AI panel-এ "Fix last build error" mode — error অংশ বের করে, উল্লেখিত ফাইল পড়ে, reviewed fix প্রস্তাব। `BuildErrorsTest`।
 - [x] Agent ধাপ ২খ: fix apply হলে user অনুমতিতে একই Gradle task আবার চালানো (শুধু সাধারণ task নাম, কোনো arbitrary command নয়); fail করলে অনুমতি নিয়ে নতুন error দিয়ে আবার fix — সর্বোচ্চ ৩ বার। Fix-এর আগে open editor save, rebuild-এর আগে নয় (AI-এর পরিবর্তন যেন stale buffer-এ না মোছে)।
-- [ ] Agent ধাপ ৩: streaming response; chat/session persistence।
+- [x] Agent ধাপ ৩ক: project-ভিত্তিক AI history (app-private storage, সর্বোচ্চ ৫০টি, project ফোল্ডারে নয়); History বোতাম, পুরোনো request আবার ব্যবহার, history মুছে ফেলা; app খুললে শেষ উত্তর দেখায়। `AIChatHistoryTest`।
+- [x] Updater fix (v0.1.5): download progress UI main thread-এ।
+- [ ] Agent ধাপ ৩খ: streaming response।
 - [ ] প্রতিটি provider-এর real connection test ও model compatibility matrix।
 - [ ] Streaming response, timeout, retry, rate-limit/quota এবং network error handling।
 - [ ] Provider/model selector ও usage/error status UX উন্নত করা।

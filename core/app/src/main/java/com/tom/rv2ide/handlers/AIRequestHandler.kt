@@ -32,13 +32,13 @@ class AIRequestHandler(
 ) {
     
     private var executionJob: Job? = null
-    private var onFinished: ((appliedFiles: Int) -> Unit)? = null
+    /** How a request ended. [appliedFiles] counts files written after user approval. */
+    data class Outcome(val appliedFiles: Int, val text: String, val error: Boolean)
 
-    /**
-     * @param onDone called on the main thread when the request ends; the argument is the number of
-     *   files written after user approval (0 for text answers, rejections and errors).
-     */
-    fun execute(userRequest: String, allowEdits: Boolean = true, onDone: ((appliedFiles: Int) -> Unit)? = null) {
+    private var onFinished: ((Outcome) -> Unit)? = null
+
+    /** @param onDone called on the main thread when the request ends. */
+    fun execute(userRequest: String, allowEdits: Boolean = true, onDone: ((Outcome) -> Unit)? = null) {
         executionJob?.cancel()
         onFinished = onDone
         executionJob = lifecycleScope.launch {
@@ -59,7 +59,7 @@ class AIRequestHandler(
                     executeBtn.isEnabled = true
                     progressIndicator.visibility = View.GONE
                     statusText.text = "❌ Error: ${e.message}"
-                    finish(0)
+                    finish(Outcome(0, "Error: ${e.message}", true))
                 }
             }
         }
@@ -144,13 +144,13 @@ class AIRequestHandler(
         }
         
         executeBtn.isEnabled = true
-        finish(summary.successfulFiles)
+        finish(Outcome(summary.successfulFiles, buildSummaryText(summary), false))
     }
 
-    private fun finish(applied: Int) {
+    private fun finish(outcome: Outcome) {
         val callback = onFinished
         onFinished = null
-        callback?.invoke(applied)
+        callback?.invoke(outcome)
     }
 
     private fun handleTextResponse(response: String) {
@@ -159,7 +159,7 @@ class AIRequestHandler(
         statusText.text = response
         summaryCard.visibility = View.GONE
         fileModificationList.visibility = View.GONE
-        finish(0)
+        finish(Outcome(0, response, false))
     }
     
     private fun handleError(message: String) {
@@ -173,7 +173,7 @@ $message
 
 Please check the error message and try again.
         """.trimIndent()
-        finish(0)
+        finish(Outcome(0, message, true))
     }
     
     private fun buildSummaryText(summary: AIAgentManager.ModificationSummary): String {

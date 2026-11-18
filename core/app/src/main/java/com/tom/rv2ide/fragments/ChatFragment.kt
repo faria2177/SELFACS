@@ -70,6 +70,8 @@ class ChatFragment : Fragment() {
     private lateinit var aiRequestHandler: AIRequestHandler
     
     private var requestMode = 0
+    private val modeNames = arrayOf("Propose code edits", "Ask / explain", "Code review", "Project analysis", "Analyze build error", "Fix last build error")
+    private var history: com.tom.rv2ide.artificial.history.AIChatHistory? = null
     private var typingJob: Job? = null
     private var fileMonitorJob: Job? = null
     private var completionStateMonitorJob: Job? = null
@@ -144,6 +146,88 @@ class ChatFragment : Fragment() {
         progressIndicator = view.findViewById(R.id.progressIndicator)
         fileModificationList = view.findViewById(R.id.fileModificationList)
         summaryCard = view.findViewById(R.id.summaryCard)
+        addHistoryButton()
+    }
+
+    // ---------- per-project AI history ----------
+
+    private fun addHistoryButton() {
+        val row = clearBtn.parent as? android.view.ViewGroup ?: return
+        val button = MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text = "History"
+            isAllCaps = false
+            setOnClickListener { showHistory() }
+        }
+        val lp = android.widget.LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
+        row.addView(button, 0, lp)
+    }
+
+    private fun record(mode: String, prompt: String, outcome: com.tom.rv2ide.handlers.AIRequestHandler.Outcome) {
+        val store = history ?: return
+        val entry = com.tom.rv2ide.artificial.history.AIChatHistory.Entry(
+            System.currentTimeMillis(), mode, prompt, outcome.text, outcome.appliedFiles, outcome.error
+        )
+        lifecycleScope.launch(Dispatchers.IO) { runCatching { store.add(entry) } }
+    }
+
+    private fun showHistory() {
+        val store = history ?: run { showSnackbar("No project loaded."); return }
+        lifecycleScope.launch {
+            val entries = withContext(Dispatchers.IO) { store.load() }
+            if (!isAdded) return@launch
+            if (entries.isEmpty()) { showSnackbar("No AI history for this project yet."); return@launch }
+            val labels = entries.map { e ->
+                val time = android.text.format.DateUtils.getRelativeTimeSpanString(e.time)
+                val icon = when { e.error -> "❌"; e.appliedFiles > 0 -> "✅"; else -> "💬" }
+                "$icon ${e.mode} · $time\n${e.prompt.lineSequence().firstOrNull().orEmpty().take(80)}"
+            }.toTypedArray()
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("AI history (${entries.size})")
+                .setItems(labels) { _, which -> showHistoryEntry(entries[which]) }
+                .setNeutralButton("Clear history") { _, _ ->
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                        .setMessage("Delete the saved AI history for this project?")
+                        .setPositiveButton("Delete") { _, _ ->
+                            lifecycleScope.launch(Dispatchers.IO) { store.clear() }
+                            showSnackbar("History cleared.")
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+    }
+
+    private fun showHistoryEntry(e: com.tom.rv2ide.artificial.history.AIChatHistory.Entry) {
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val text = android.widget.TextView(requireContext()).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            setTextIsSelectable(true)
+            this.text = buildString {
+                append("Request:\n").append(e.prompt.ifBlank { "(no note)" })
+                append("\n\n").append(if (e.error) "Error:" else "Answer:").append("\n").append(e.response)
+                if (e.appliedFiles > 0) append("\n\nFiles changed: ${e.appliedFiles}")
+            }
+        }
+        val scroll = android.widget.ScrollView(requireContext()).apply { addView(text) }
+        val mode = modeNames.indexOf(e.mode)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("${e.mode} · ${android.text.format.DateUtils.getRelativeTimeSpanString(e.time)}")
+            .setView(scroll)
+            .setPositiveButton("Reuse request") { _, _ ->
+                if (mode in 0..4) {
+                    requestMode = mode
+                    view?.findViewById<MaterialButton>(R.id.aiModeButton)?.text = modeNames[mode]
+                    promptInput.setText(e.prompt)
+                } else {
+                    showSnackbar("Build fixes use the latest build log; choose \"Fix last build error\" again.")
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun setupRecyclerView() {
@@ -186,7 +270,7 @@ class ChatFragment : Fragment() {
     }
 
     private fun setupListeners() {
-        val modes = arrayOf("Propose code edits", "Ask / explain", "Code review", "Project analysis", "Analyze build error", "Fix last build error")
+        val modes = modeNames
         val modeButton = requireView().findViewById<MaterialButton>(R.id.aiModeButton)
         modeButton.text = modes[requestMode]
         modeButton.setOnClickListener {
@@ -227,7 +311,10 @@ class ChatFragment : Fragment() {
                 4 -> "Analyze pasted build log, root cause, affected files and exact suggested fixes. Do not claim a build ran. "
                 else -> ""
             }
-            aiRequestHandler.execute(prefix + userRequest, allowEdits = requestMode == 0)
+            val modeName = modeNames[requestMode]
+            aiRequestHandler.execute(prefix + userRequest, allowEdits = requestMode == 0) { outcome ->
+                record(modeName, userRequest, outcome)
+            }
         }
     
         clearBtn.setOnClickListener {
@@ -254,8 +341,10 @@ class ChatFragment : Fragment() {
             (activity as? com.tom.rv2ide.interfaces.IEditorHandler)?.saveAll(notify = false, requestSync = false)
             val prompt = BuildErrors.prompt(
                 snapshot, BuildFixLoop.note(attempt, userNote))
-            aiRequestHandler.execute(prompt, allowEdits = true) { applied ->
-                if (applied > 0 && isAdded) offerRebuild(snapshot.tasks, attempt)
+            aiRequestHandler.execute(prompt, allowEdits = true) { outcome ->
+                val label = if (attempt > 1) "attempt $attempt" else "attempt 1"
+                record(modeNames[5], listOf(label, userNote.trim()).filter { it.isNotEmpty() }.joinToString(" · "), outcome)
+                if (outcome.appliedFiles > 0 && isAdded) offerRebuild(snapshot.tasks, attempt)
             }
         }
     }
@@ -385,6 +474,12 @@ class ChatFragment : Fragment() {
                 
                 if (success) {
                     statusText.text = "Project loaded successfully"
+                    val store = com.tom.rv2ide.artificial.history.AIChatHistory(requireContext(), userRootProject)
+                    history = store
+                    val last = withContext(Dispatchers.IO) { store.load().firstOrNull() }
+                    if (last != null && isAdded) {
+                        statusText.text = "Last AI answer (${android.text.format.DateUtils.getRelativeTimeSpanString(last.time)} · ${last.mode}):\n\n${last.response.take(4000)}\n\nTap History for earlier requests."
+                    }
                 } else {
                     statusText.text = "Failed to load project"
                 }
