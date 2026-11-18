@@ -42,7 +42,7 @@ object SelfacsUpdateUi {
 
   fun Context.color(attr: Int, fallback: Int): Int = MaterialColors.getColor(this, attr, fallback)
 
-  fun Context.primary() = color(MR.attr.colorPrimary, 0xff5b6abf.toInt())
+  fun Context.primary() = color(androidx.appcompat.R.attr.colorPrimary, 0xff5b6abf.toInt())
   fun Context.onPrimary() = color(MR.attr.colorOnPrimary, 0xffffffff.toInt())
   fun Context.primaryContainer() = color(MR.attr.colorPrimaryContainer, 0xff34407a.toInt())
   fun Context.onPrimaryContainer() = color(MR.attr.colorOnPrimaryContainer, 0xffdde1ff.toInt())

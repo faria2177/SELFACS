@@ -272,7 +272,7 @@ class SelfacsUpdatesActivity : AppCompatActivity() {
   private fun versionCard(icon: Int, value: String, label: String, highlighted: Boolean): LinearLayout =
       card(if (highlighted) primaryContainer() else surfaceHighest()).apply {
         val fg = if (highlighted) onPrimaryContainer() else onSurface()
-        addView(iconBox(icon, if (highlighted) color(MR.attr.colorPrimary, primary()) else surfaceHigh(),
+        addView(iconBox(icon, if (highlighted) color(androidx.appcompat.R.attr.colorPrimary, primary()) else surfaceHigh(),
             if (highlighted) color(MR.attr.colorOnPrimary, 0xffffffff.toInt()) else fg, 44, 22))
         addView(text(value, 22f, fg, bold = true), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(12) })
         addView(text(label, 14f, fg))
