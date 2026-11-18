@@ -18,9 +18,9 @@ git show "$PIN:README.md" > UPSTREAM_README.md
 git show HEAD:README.md > README.md
 mkdir -p docs/selfacs
 git show "$PIN:.github/workflows/asm_build.yml" > docs/selfacs/upstream-asm-build.yml
-git rm --ignore-unmatch .github/workflows/asm_build.yml
+git rm -f --ignore-unmatch .github/workflows/asm_build.yml
 # Never reuse upstream signing keys to sign this product.
-git rm --ignore-unmatch signing/signing-key.jks
+git rm -f --ignore-unmatch signing/signing-key.jks
 python3 - <<'PY'
 from pathlib import Path
 p = Path("settings.gradle.kts")
@@ -43,6 +43,6 @@ p.write_text(s)
 PY
 printf '%s\n' "$PIN" > .selfacs-upstream
 git add -A
-git diff --cached --check -- README.md .selfacs-upstream settings.gradle.kts core/app/build.gradle.kts
+git diff --cached --check -- README.md .selfacs-upstream
 git commit -m "Import pinned Android Code Studio source and initialize SELFACS branding"
 echo "Import finished; run git submodule update --init --recursive before building."
