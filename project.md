@@ -83,11 +83,11 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 ## 4. Pending work — priority roadmap
 
 ### P0 — Build stability & correctness
-- [ ] Latest commit `14184ae733098ef97ab6efd57a2f6990b1ff4623`-এর GitHub Actions run সফলভাবে শেষ করা।
-- [ ] GitHub Studio compile/test failures থাকলে ঠিক করা।
+- [x] GitHub Actions run সফল (commit `7a9c575`, run 44253742681)।
+- [x] GitHub Studio compile failure (`singleLine`) ও build script error ঠিক করা।
 - [ ] GitHub API workflow list ও run list-এর response parsing live API response দিয়ে যাচাই করা।
-- [ ] Flutter workspace, AI edit planner এবং GitHub validation unit tests সব pass করানো।
-- [ ] Debug APK artifact তৈরি ও install করে launch test করা।
+- [~] Flutter workspace ও AI edit planner unit tests CI-তে pass; GitHub validation-এর আলাদা test coverage যাচাই বাকি।
+- [~] Debug APK artifact তৈরি হয়েছে; ডিভাইসে install/launch test বাকি।
 - [ ] Android 10/11, Android 13+ এবং Android 16-এ smoke test।
 - [ ] Low RAM/storage ও network failure handling যাচাই।
 - [ ] Build status, artifact link ও test evidence এই ফাইলে লিখে রাখা।
@@ -151,12 +151,15 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 
 ## 5. Current CI/build status
 
-- Latest branch head: `14184ae733098ef97ab6efd57a2f6990b1ff4623`
-- Latest workflow run: [Run #15](https://github.com/faria2177/SELFACS/actions/runs/44251560052)
-- Last observed status while this document was prepared: **pending** (jobs had not started/returned yet).
-- Therefore latest GitHub Studio changes-এর build success এখনো confirmed নয়।
-- Earlier successful debug APK artifact (older commit; current GitHub Studio/Flutter additions অন্তর্ভুক্ত নয়): [Download older SELFACS debug APK](https://github.com/faria2177/SELFACS/actions/runs/44247028525).
-- পুরোনো artifact-কে current build বা release হিসেবে ব্যবহার করা যাবে না।
+- Verified commit: `7a9c575` (main)
+- Workflow run: [Run 44253742681](https://github.com/faria2177/SELFACS/actions/runs/44253742681) — **success** (2026-11-18)
+  - Upstream editor dependency build: সফল
+  - AI edit planner + Flutter workspace unit tests: সফল
+  - Debug APK assemble: সফল; artifact `SELFACS-debug-apks` (~258 MB, ARM64 + ARMv7)
+- আগের failure-এর কারণ ও fix:
+  - `core/app/build.gradle.kts`-এ newline-এর জায়গায় literal `\n` → ঠিক করা হয়েছে; duplicate `security-crypto` dependency সরানো।
+  - `GitHubStudioFragment.kt`-এ `singleLine` unresolved → `setSingleLine(true)`।
+- এখনো বাকি: APK বাস্তব ডিভাইসে install/launch test। Device test ছাড়া কোনো feature **Verified** নয়।
 
 ## 6. Definition of done
 
@@ -181,4 +184,4 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 
 ---
 
-**Next immediate action:** Latest CI run সম্পন্ন করে GitHub Studio + Flutter + AI unit tests এবং debug APK build pass করানো; এরপর P0 evidence update করা।
+**Next immediate action:** Run 44253742681-এর debug APK ডিভাইসে install করে launch, AI Studio, Flutter Studio ও GitHub Studio smoke test করা এবং ফলাফল এখানে লেখা; তারপর P1 package migration plan।
