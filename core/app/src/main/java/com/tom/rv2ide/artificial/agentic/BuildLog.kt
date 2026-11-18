@@ -125,3 +125,27 @@ object BuildErrors {
     appendLine("```")
   }
 }
+
+/** Policy for the user-approved "fix → rebuild → fix again" loop. */
+object BuildFixLoop {
+
+  const val MAX_ATTEMPTS = 3
+
+  private val gradleTask = Regex("""^[A-Za-z0-9_:.\-]{1,200}$""")
+
+  /** Only plain Gradle task names from the failed build are re-run; never arbitrary commands. */
+  fun rebuildTasks(tasks: List<String>): List<String> =
+      tasks.map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("-") && gradleTask.matches(it) }.distinct().take(10)
+
+  fun canRetry(attempt: Int) = attempt < MAX_ATTEMPTS
+
+  /** Extra context for attempts after the first one. */
+  fun note(attempt: Int, userNote: String): String {
+    val base = userNote.trim()
+    if (attempt <= 1) return base
+    val retry =
+        "Attempt $attempt of $MAX_ATTEMPTS: the previous AI fix was applied but the build still fails. " +
+            "Use the NEW errors below, re-read the changed files, and do not repeat the same change."
+    return if (base.isEmpty()) retry else "$retry\n$base"
+  }
+}

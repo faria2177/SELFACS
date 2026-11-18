@@ -76,4 +76,14 @@ class BuildErrorsTest {
     assertTrue(prompt.contains("please keep API 26"))
     assertTrue(prompt.contains(":app:assembleDebug"))
   }
+
+  @Test
+  fun loopOnlyRerunsPlainGradleTasks() {
+    assertEquals(listOf(":app:assembleDebug", "assembleRelease"),
+        BuildFixLoop.rebuildTasks(listOf(":app:assembleDebug", "--init-script=/x", "rm -rf /", "assembleRelease", ":app:assembleDebug")))
+    assertTrue(BuildFixLoop.canRetry(2))
+    assertFalse(BuildFixLoop.canRetry(BuildFixLoop.MAX_ATTEMPTS))
+    assertEquals("keep it", BuildFixLoop.note(1, " keep it "))
+    assertTrue(BuildFixLoop.note(2, "").startsWith("Attempt 2 of"))
+  }
 }

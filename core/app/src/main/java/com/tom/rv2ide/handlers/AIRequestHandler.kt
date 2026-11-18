@@ -32,9 +32,15 @@ class AIRequestHandler(
 ) {
     
     private var executionJob: Job? = null
-    
-    fun execute(userRequest: String, allowEdits: Boolean = true) {
+    private var onFinished: ((appliedFiles: Int) -> Unit)? = null
+
+    /**
+     * @param onDone called on the main thread when the request ends; the argument is the number of
+     *   files written after user approval (0 for text answers, rejections and errors).
+     */
+    fun execute(userRequest: String, allowEdits: Boolean = true, onDone: ((appliedFiles: Int) -> Unit)? = null) {
         executionJob?.cancel()
+        onFinished = onDone
         executionJob = lifecycleScope.launch {
             try {
                 withContext(Dispatchers.Main) {
@@ -53,6 +59,7 @@ class AIRequestHandler(
                     executeBtn.isEnabled = true
                     progressIndicator.visibility = View.GONE
                     statusText.text = "❌ Error: ${e.message}"
+                    finish(0)
                 }
             }
         }
@@ -137,6 +144,13 @@ class AIRequestHandler(
         }
         
         executeBtn.isEnabled = true
+        finish(summary.successfulFiles)
+    }
+
+    private fun finish(applied: Int) {
+        val callback = onFinished
+        onFinished = null
+        callback?.invoke(applied)
     }
 
     private fun handleTextResponse(response: String) {
@@ -145,6 +159,7 @@ class AIRequestHandler(
         statusText.text = response
         summaryCard.visibility = View.GONE
         fileModificationList.visibility = View.GONE
+        finish(0)
     }
     
     private fun handleError(message: String) {
@@ -158,6 +173,7 @@ $message
 
 Please check the error message and try again.
         """.trimIndent()
+        finish(0)
     }
     
     private fun buildSummaryText(summary: AIAgentManager.ModificationSummary): String {
@@ -181,6 +197,7 @@ Please check the error message and try again.
     }
     
     fun cancel() {
+        onFinished = null
         executionJob?.cancel()
     }
 }

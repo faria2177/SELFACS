@@ -42,6 +42,11 @@ import com.tom.rv2ide.activities.editor.EditorHandlerActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.tom.rv2ide.artificial.agentic.BuildErrors
+import com.tom.rv2ide.artificial.agentic.BuildFixLoop
+import com.tom.rv2ide.artificial.agentic.BuildLogCapture
 import java.io.File
 
 /**
@@ -205,22 +210,7 @@ class ChatFragment : Fragment() {
             val userRequest = promptInput.text.toString()
 
             if (requestMode == 5) {
-                val snapshot = com.tom.rv2ide.artificial.agentic.BuildLogCapture.snapshot()
-                when (snapshot.state) {
-                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.FAILED -> {
-                        codeCompletionManager.clearSuggestion()
-                        aiRequestHandler.execute(
-                            com.tom.rv2ide.artificial.agentic.BuildErrors.prompt(snapshot, userRequest),
-                            allowEdits = true,
-                        )
-                    }
-                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.RUNNING ->
-                        showSnackbar("A build is still running. Wait for it to finish.")
-                    com.tom.rv2ide.artificial.agentic.BuildLogCapture.State.SUCCESS ->
-                        showSnackbar("The last build succeeded. Nothing to fix.")
-                    else ->
-                        showSnackbar("No failed build in this session yet. Run a build first, or paste a log in \"Analyze build error\".")
-                }
+                startBuildFix(userRequest, attempt = 1)
                 return@setOnClickListener
             }
 
@@ -245,6 +235,94 @@ class ChatFragment : Fragment() {
         }
     }
     
+    // ---------- AI build-fix loop (every write and every build needs user approval) ----------
+
+    private fun startBuildFix(userNote: String, attempt: Int) {
+        val snapshot = BuildLogCapture.snapshot()
+        when (snapshot.state) {
+            BuildLogCapture.State.FAILED -> Unit
+            BuildLogCapture.State.RUNNING -> { showSnackbar("A build is still running. Wait for it to finish."); return }
+            BuildLogCapture.State.SUCCESS -> { showSnackbar("The last build succeeded. Nothing to fix."); return }
+            else -> {
+                showSnackbar("No failed build in this session yet. Run a build first, or paste a log in \"Analyze build error\".")
+                return
+            }
+        }
+        codeCompletionManager.clearSuggestion()
+        lifecycleScope.launch {
+            // Save open editors first so the AI works on what is on disk and nothing stale overwrites its fix later.
+            (activity as? com.tom.rv2ide.interfaces.IEditorHandler)?.saveAll(notify = false, requestSync = false)
+            val prompt = BuildErrors.prompt(
+                snapshot, BuildFixLoop.note(attempt, userNote))
+            aiRequestHandler.execute(prompt, allowEdits = true) { applied ->
+                if (applied > 0 && isAdded) offerRebuild(snapshot.tasks, attempt)
+            }
+        }
+    }
+
+    private fun offerRebuild(previousTasks: List<String>, attempt: Int) {
+        val tasks = BuildFixLoop.rebuildTasks(previousTasks)
+        if (tasks.isEmpty()) {
+            showSnackbar("Fix applied. Run the build again to verify.")
+            return
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Rebuild to verify the fix?")
+            .setMessage("SELFACS will run the same Gradle task(s) as the failed build:\n\n${tasks.joinToString("\n")}\n\nNothing else is executed.")
+            .setPositiveButton("Run build") { _, _ -> runRebuild(tasks, attempt) }
+            .setNegativeButton("Not now", null)
+            .show()
+    }
+
+    private fun runRebuild(tasks: List<String>, attempt: Int) {
+        val service = com.tom.rv2ide.lookup.Lookup.getDefault()
+            .lookup(com.tom.rv2ide.projects.builder.BuildService.KEY_BUILD_SERVICE)
+        if (service == null || !service.isToolingServerStarted()) {
+            showSnackbar("Build service is not ready. Open the project and wait for sync, then build manually.")
+            return
+        }
+        if (BuildLogCapture.snapshot().state ==
+            BuildLogCapture.State.RUNNING) {
+            showSnackbar("A build is already running.")
+            return
+        }
+        executeBtn.isEnabled = false
+        progressIndicator.visibility = View.VISIBLE
+        statusText.text = "🔨 Rebuilding to verify the AI fix (attempt $attempt of ${BuildFixLoop.MAX_ATTEMPTS})…"
+        lifecycleScope.launch {
+            val ok = try {
+                withContext(Dispatchers.IO) { service.executeTasks(*tasks.toTypedArray()).get() }?.isSuccessful == true
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("ChatFragment", "Rebuild failed to run", e)
+                false
+            }
+            if (!isAdded) return@launch
+            executeBtn.isEnabled = true
+            progressIndicator.visibility = View.GONE
+            if (ok) {
+                statusText.text = "✅ Build succeeded after the AI fix."
+                return@launch
+            }
+            val failed = BuildLogCapture.snapshot().state ==
+                BuildLogCapture.State.FAILED
+            if (!failed) {
+                statusText.text = "⚠️ The build could not run. Check the build output."
+            } else if (BuildFixLoop.canRetry(attempt)) {
+                statusText.text = "❌ Build still fails after attempt $attempt."
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Build still fails")
+                    .setMessage("Let the AI analyse the new errors and propose another fix? (attempt ${attempt + 1} of ${BuildFixLoop.MAX_ATTEMPTS})")
+                    .setPositiveButton("Try again") { _, _ -> startBuildFix("", attempt + 1) }
+                    .setNegativeButton("Stop", null)
+                    .show()
+            } else {
+                statusText.text = "❌ Build still fails after ${BuildFixLoop.MAX_ATTEMPTS} AI attempts. Review the build output; you can undo AI changes."
+            }
+        }
+    }
+
     private fun registerPreferenceListener() {
         val prefs = requireContext().getSharedPreferences("ai_preferences", android.content.Context.MODE_PRIVATE)
         prefs.registerOnSharedPreferenceChangeListener(sharedPrefsListener)

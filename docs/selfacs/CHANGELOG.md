@@ -3,6 +3,7 @@
 ## Next
 
 - AI panel: new "Fix last build error" mode uses the last failed build automatically (no pasting), reads the affected files and proposes a fix for review.
+- After an approved fix, SELFACS offers to rebuild the same task; if it still fails, the AI can try again with the new errors (up to 3 attempts, each step needs your approval).
 
 ## v0.1.2
 
