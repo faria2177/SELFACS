@@ -10,6 +10,8 @@ import android.widget.ScrollView
 import android.widget.Toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tom.rv2ide.artificial.agents.compatible.CloudProviders
+import com.tom.rv2ide.artificial.agents.compatible.CompatibleChatTransport
+import kotlinx.coroutines.*
 
 object CloudProviderConfigDialog {
     fun show(context: Context, provider: CloudProviders.Provider, onSaved: () -> Unit) {
@@ -35,6 +37,11 @@ object CloudProviderConfigDialog {
         val endpoint = if (customEndpoint) field("HTTPS chat completions endpoint",
             old?.endpoint ?: provider.endpoint, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI) else null
 
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        fun enteredConfig() = CloudProviders.Config(key.text.toString().trim().ifBlank { old?.key.orEmpty() },
+            model.text.toString().trim(), endpoint?.text?.toString()?.trim() ?: provider.endpoint)
+        val testButton = android.widget.Button(context).apply { text = "Test connection" }
+        content.addView(testButton)
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(provider.name + " settings")
             .setMessage("Use your own API key and model ID. Requests may incur charges and send project source to this provider. Review project secrets before using AI. Auto-switch may send requests to another configured provider when enabled.")
@@ -43,15 +50,37 @@ object CloudProviderConfigDialog {
             .setNegativeButton("Cancel", null)
             .setNeutralButton("Get API key", null)
             .create()
+        dialog.setOnDismissListener { scope.cancel() }
+        testButton.setOnClickListener {
+            val config = enteredConfig()
+            if (config.key.isBlank() || config.model.isBlank() || !CloudProviders.validEndpoint(provider, config.endpoint)) {
+                Toast.makeText(context, "Enter key, model and an approved HTTPS endpoint", Toast.LENGTH_LONG).show()
+            } else {
+                testButton.isEnabled = false
+                testButton.text = "Testing…"
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            CompatibleChatTransport.complete(provider, config, "Reply with OK only.", "Connection test")
+                        }
+                        Toast.makeText(context, "Connection successful", Toast.LENGTH_SHORT).show()
+                    } catch (e: CancellationException) { throw e }
+                      catch (e: Exception) {
+                        Toast.makeText(context, e.message?.take(160) ?: "Connection failed", Toast.LENGTH_LONG).show()
+                    } finally {
+                        testButton.text = "Test connection"
+                        testButton.isEnabled = true
+                    }
+                }
+            }
+        }
         dialog.setOnShowListener {
             dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(provider.keyPage))) }
                     .onFailure { Toast.makeText(context, "No browser available", Toast.LENGTH_SHORT).show() }
             }
             dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val enteredKey = key.text.toString().trim()
-                val config = CloudProviders.Config(enteredKey.ifBlank { old?.key.orEmpty() },
-                    model.text.toString().trim(), endpoint?.text?.toString()?.trim() ?: provider.endpoint)
+                val config = enteredConfig()
                 try {
                     CloudProviders.save(context, provider, config)
                     dialog.dismiss()

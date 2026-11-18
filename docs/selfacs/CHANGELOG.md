@@ -20,3 +20,5 @@
 - Configure from editor AI Settings. New provider credentials are encrypted via Android Keystore-backed storage. No API keys or live requests are bundled.
 - Scope new provider file writes to the current project; use bounded source context, basic secret filtering, no redirect credential forwarding. Filtering is heuristic, not a guarantee against secret exposure.
 - Existing provider credentials retain upstream storage; summaries are masked. Live provider and APK validation still pending.
+
+- Added connection test with a minimal prompt (no project context); removed cached credential use so clearing keys prevents new requests.

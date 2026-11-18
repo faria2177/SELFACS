@@ -15,19 +15,20 @@ import kotlinx.coroutines.withContext
 class CompatibleCloudAgent(private val provider: CloudProviders.Provider) : AIAgent {
     override val providerId = provider.id
     override val providerName = provider.name
-    private var config: CloudProviders.Config? = null
+    private var appContext: Context? = null
+    private fun activeConfig() = appContext?.let { CloudProviders.get(it, providerId) }
     private var writer: AIFileWriter? = null
     private var project: ProjectTreeResult? = null
     private val history = mutableListOf<ModificationAttempt>()
     private var attempts = 0
     override fun initialize(apiKey: String, context: Context) {
-        config = CloudProviders.get(context, providerId)
+        appContext = context.applicationContext
     }
     override fun reinitializeWithNewModel(apiKey: String, context: Context) = initialize(apiKey, context)
     override fun setContext(context: Context) { writer = AIFileWriter(context) }
     override fun setProjectData(projectTreeResult: ProjectTreeResult) { project = projectTreeResult }
     override fun clearConversation() { history.clear(); attempts = 0 }
-    override fun isInitialized() = config != null
+    override fun isInitialized() = activeConfig() != null
     override fun resetAttemptCount() { attempts = 0 }
     override fun incrementAttemptCount() { attempts++ }
     override fun getCurrentAttemptCount() = attempts
@@ -53,7 +54,7 @@ class CompatibleCloudAgent(private val provider: CloudProviders.Provider) : AIAg
     override suspend fun generateCode(prompt: String, context: String?, language: String, projectStructure: String?): Result<String> =
         withContext(Dispatchers.IO) {
             try {
-                val active = config ?: error("Configure $providerName API key and model in AI Settings")
+                val active = activeConfig() ?: error("Configure $providerName API key and model in AI Settings")
                 val isCompletion = prompt.startsWith("You are an intelligent code completion AI")
                 val instruction = if (isCompletion) "Return only the code completion text." else WritingRules.Instructions().useThis()
                 val full = buildString {
