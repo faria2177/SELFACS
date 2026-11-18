@@ -1,5 +1,11 @@
 # SELFACS changelog
 
+## v0.1.2
+
+- New in-app updater: update prompt on launch, Updates screen, verified download and install.
+- AI agent can read files, list folders and search the project before answering.
+- Signed with the SELFACS release key. Future updates appear automatically.
+
 ## Development baseline (not a release)
 
 - Imported the pinned Android Code Studio source and preserved upstream licenses.

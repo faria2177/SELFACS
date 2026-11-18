@@ -1,6 +1,17 @@
 {
-  "baseVersionCode": 0,
-  "baseVersionName": "unreleased",
-  "variants": {},
+  "baseVersionCode": 3020,
+  "baseVersionName": "0.1.2",
+  "variants": {
+    "arm64-v8a": {
+      "versionCode": 3020,
+      "versionName": "0.1.2",
+      "apkUrl": "https://github.com/faria2177/SELFACS/releases/download/v0.1.2/selfacs-arm64-v8a-release.apk"
+    },
+    "armeabi-v7a": {
+      "versionCode": 3021,
+      "versionName": "0.1.2",
+      "apkUrl": "https://github.com/faria2177/SELFACS/releases/download/v0.1.2/selfacs-armeabi-v7a-release.apk"
+    }
+  },
   "changelog": "https://raw.githubusercontent.com/faria2177/SELFACS/main/docs/selfacs/CHANGELOG.md"
 }
