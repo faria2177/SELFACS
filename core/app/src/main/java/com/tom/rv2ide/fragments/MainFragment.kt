@@ -116,6 +116,7 @@ class MainFragment : BaseFragment() {
               MainScreenAction.ACTION_OPEN_TERMINAL ->
                   startActivity(Intent(requireActivity(), TerminalActivity::class.java))
 
+              MainScreenAction.ACTION_TOOLCHAIN_STATUS -> showToolchainStatus()
               MainScreenAction.ACTION_PREFERENCES -> gotoPreferences()
               MainScreenAction.ACTION_DONATE -> {
                 startActivity(Intent(requireActivity(), IDEConfigurations::class.java))
@@ -141,6 +142,34 @@ class MainFragment : BaseFragment() {
         }
 
     binding!!.actions.adapter = MainActionsListAdapter(actions)
+  }
+
+  private fun showToolchainStatus() {
+    val context = requireContext()
+    val snapshot = com.tom.rv2ide.utils.SelfacsToolchainStatus.inspect(
+        context.filesDir,
+        Environment.PROJECTS_DIR,
+    )
+    val details = buildString {
+      appendLine(getString(R.string.selfacs_device_abi, android.os.Build.SUPPORTED_ABIS.joinToString(", ")))
+      appendLine(getString(R.string.selfacs_device_android, android.os.Build.VERSION.RELEASE, android.os.Build.VERSION.SDK_INT))
+      appendLine()
+      snapshot.forEach { check ->
+        val status = getString(if (check.available) R.string.selfacs_present else R.string.selfacs_missing)
+        appendLine(getString(check.label) + ": " + status)
+        appendLine(check.detail)
+        appendLine()
+      }
+      append(getString(R.string.selfacs_diagnostics_note))
+    }
+    DialogUtils.newMaterialDialogBuilder(context)
+        .setTitle(R.string.selfacs_toolchain_title)
+        .setMessage(details)
+        .setPositiveButton(R.string.selfacs_manage_tools) { _, _ ->
+          startActivity(Intent(requireActivity(), IDEConfigurations::class.java))
+        }
+        .setNegativeButton(android.R.string.cancel, null)
+        .show()
   }
 
   override fun onDestroyView() {

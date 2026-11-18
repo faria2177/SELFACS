@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="selfacs_workspace_title">Developer workspace</string>
+  <string name="selfacs_workspace_subtitle">Create, edit, build and run Android projects.</string>
+  <string name="selfacs_toolchain_title">Toolchain diagnostics</string>
+  <string name="selfacs_device_abi">Device ABI: %1$s</string>
+  <string name="selfacs_device_android">Android %1$s (API %2$d)</string>
+  <string name="selfacs_present">Present</string>
+  <string name="selfacs_missing">Missing or inaccessible</string>
+  <string name="selfacs_manage_tools">Manage tools</string>
+  <string name="selfacs_diag_shell">Terminal shell</string>
+  <string name="selfacs_diag_java">Java runtime</string>
+  <string name="selfacs_diag_sdk">Android SDK platforms</string>
+  <string name="selfacs_diag_gradle">Gradle executable</string>
+  <string name="selfacs_diag_projects">Project directory</string>
+  <string name="selfacs_diag_none">No installed platform found</string>
+  <string name="selfacs_diagnostics_note">Local file checks only. A present tool still needs a successful execution or project build to confirm compatibility. Gradle wrappers may work without a separate Gradle executable.</string>
+</resources>

@@ -28,7 +28,8 @@
 
   <androidx.constraintlayout.widget.ConstraintLayout
     android:id="@+id/greeting"
-    android:layout_width="wrap_content"
+    android:layout_width="0dp"
+    app:layout_constraintWidth_percent="0.42"
     android:layout_height="wrap_content"
     app:layout_constraintStart_toStartOf="parent"
     app:layout_constraintEnd_toStartOf="@id/actions"
@@ -56,7 +57,7 @@
       android:layout_marginTop="8dp"
       android:layout_marginEnd="4dp"
       android:layout_marginBottom="4dp"
-      android:text="@string/get_started"
+      android:text="@string/selfacs_workspace_title"
       android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
       android:textStyle="bold"
       android:textSize="30sp"
@@ -71,7 +72,9 @@
       android:layout_marginBottom="16dp"
       android:textSize="20sp"
       android:alpha="0.9"
-      android:text="@string/msg_create_new_project_greeting"
+      android:text="@string/selfacs_workspace_subtitle"
+      android:gravity="center"
+      android:paddingHorizontal="12dp"
       android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
       app:layout_constraintEnd_toEndOf="parent"
       app:layout_constraintStart_toStartOf="parent"
@@ -81,8 +84,10 @@
 
   <androidx.recyclerview.widget.RecyclerView
     android:id="@+id/actions"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
+    android:layout_width="0dp"
+    android:layout_height="0dp"
+    android:layout_margin="12dp"
+    android:clipToPadding="false"
     app:layout_constraintStart_toEndOf="@id/greeting"
     app:layout_constraintEnd_toEndOf="parent"
     app:layout_constraintTop_toTopOf="parent"

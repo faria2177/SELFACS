@@ -112,7 +112,7 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
 
   private fun handleActionClick(action: SimpleIconTitleDescriptionItem) {
     when (action.id) {
-      ACTION_WEBSITE -> app.openWebsite()
+      ACTION_WEBSITE -> app.openUrl("https://github.com/faria2177/SELFACS")
       ACTION_EMAIL -> app.emailUs()
       ACTION_TG_GROUP -> app.openTelegramGroup()
       ACTION_TG_CHANNEL -> app.openTelegramChannel()
@@ -133,7 +133,7 @@ class AboutActivity : EdgeToEdgeIDEActivity() {
               ACTION_WEBSITE,
               R.drawable.ic_website,
               R.string.about_option_website,
-              BuildInfo.PROJECT_SITE,
+              "https://github.com/faria2177/SELFACS",
           )
       )
       add(

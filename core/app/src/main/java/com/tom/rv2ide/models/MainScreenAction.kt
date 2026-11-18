@@ -47,6 +47,7 @@ constructor(
     const val ACTION_PREFERENCES = 4
     const val ACTION_DONATE = 5
     const val ACTION_DOCS = 6
+    const val ACTION_TOOLCHAIN_STATUS = 7
 
     /** Get all main screen actions. */
     @JvmStatic
@@ -74,6 +75,7 @@ constructor(
         val donate = MainScreenAction(ACTION_DONATE, R.string.btn_idecfg, R.drawable.ic_cfg_main)
 
         val docs = MainScreenAction(ACTION_DOCS, R.string.btn_docs, R.drawable.ic_docs)
+        val toolchainStatus = MainScreenAction(ACTION_TOOLCHAIN_STATUS, R.string.selfacs_toolchain_title, R.drawable.ic_cfg_main)
 
         Collections.addAll(
             this,
@@ -81,8 +83,9 @@ constructor(
             openProject,
             cloneGitRepository,
             openTerminal,
-            preferences,
+            toolchainStatus,
             donate,
+            preferences,
             docs,
         )
       }

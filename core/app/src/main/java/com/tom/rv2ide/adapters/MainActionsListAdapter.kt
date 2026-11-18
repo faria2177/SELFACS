@@ -19,6 +19,7 @@ package com.tom.rv2ide.adapters
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import com.tom.rv2ide.databinding.LayoutMainActionItemBinding
 import com.tom.rv2ide.models.MainScreenAction
@@ -49,7 +50,9 @@ constructor(val actions: List<MainScreenAction> = emptyList()) :
       setText(action.text)
       setIconResource(action.icon)
       setOnClickListener { action.onClick?.invoke(action, it) }
-      action.onLongClick?.let { onLongClick -> setOnLongClickListener { onLongClick(action, it) } }
+      val longClick = action.onLongClick
+      setOnLongClickListener(if (longClick == null) null else View.OnLongClickListener { longClick(action, it) })
+      isLongClickable = longClick != null
     }
   }
 }
