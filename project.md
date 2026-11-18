@@ -165,8 +165,9 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 ### Release signing
 - [x] `selfacs-release.yml`: manual signed release workflow (assembleRelease, apksigner verify, SHA256SUMS, GitHub Release)।
 - [x] Dry-run (temporary key) সফল: run 44277226745 — arm64-v8a ও armeabi-v7a release APK build ও sign হয়েছে।
-- [ ] Repository secrets যোগ করা: `SELFACS_KEYSTORE_BASE64`, `SELFACS_KEYSTORE_PASSWORD`, `SELFACS_KEY_PASSWORD`, `SELFACS_KEY_ALIAS`।
+- [x] Repository secrets যোগ করা হয়েছে: `SELFACS_KEYSTORE_BASE64`, `SELFACS_KEYSTORE_PASSWORD`, `SELFACS_KEY_PASSWORD`, `SELFACS_KEY_ALIAS`।
 - Release cert SHA-256: `48:78:C6:1B:AC:FB:41:8E:3E:F9:71:E9:FB:17:35:99:5E:03:69:C9:29:71:A7:12:77:B1:9D:F8:35:6A:37:07`
+- Signed release: [v0.1.0](https://github.com/faria2177/SELFACS/releases/tag/v0.1.0) (pre-release, run 44283501455, APK Signature v2, cert মিলেছে)।
 - Debug release: [v0.1.0-debug.1](https://github.com/faria2177/SELFACS/releases/tag/v0.1.0-debug.1) (debug key)।
 - Signing key কখনো repository-তে নয়; `.gitignore`-এ `*.jks`, `*.keystore`, `signing/`।
 
