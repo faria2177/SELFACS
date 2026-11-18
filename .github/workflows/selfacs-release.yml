@@ -117,7 +117,8 @@ jobs:
           mkdir -p out
           ls -la core/app/build/outputs/apk/release/
           for f in core/app/build/outputs/apk/release/*.apk; do
-            "$signer" verify --print-certs "$f" | grep -E "Signer #1 certificate (DN|SHA-256)"
+            "$signer" verify --verbose --print-certs "$f" > verify.txt
+            grep -E "Verified using|certificate (DN|SHA-256)" verify.txt || cat verify.txt
             abi=""
             for a in arm64-v8a armeabi-v7a x86_64 x86 universal; do
               case "$(basename "$f")" in *"$a"*) abi="$a"; break;; esac
