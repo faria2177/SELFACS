@@ -31,6 +31,15 @@ import com.tom.rv2ide.artificial.project.awareness.ProjectData
 import com.tom.rv2ide.artificial.secrets.ApiKey
 import java.io.File
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.tom.rv2ide.artificial.review.EditPlan
+import com.tom.rv2ide.artificial.review.EditReviewDialog
+import com.tom.rv2ide.artificial.review.ProposedEdit
+import com.tom.rv2ide.artificial.file.AIFileWriter
 import com.tom.rv2ide.artificial.dialogs.ProviderSwitchDialog
 
 /**
@@ -45,6 +54,8 @@ class AIAgentManager(private val context: Context) {
     private var currentProviderId: String = Agents(context).getProvider()
     private var currentAgent: AIAgent? = null
     private val providerSwitchDialog = ProviderSwitchDialog(context)
+    private val requestMutex = Mutex()
+    private val undoHistory = mutableListOf<ProposedEdit>()
 
     init {
         Gemini.registerAgent()
@@ -56,7 +67,7 @@ class AIAgentManager(private val context: Context) {
         com.tom.rv2ide.artificial.agents.compatible.CloudProviders.register(context)
         
         permissionManager.setFileWriteEnabled(true)
-        permissionManager.setRequireConfirmation(false)
+        permissionManager.setRequireConfirmation(true)
         
         setProvider(currentProviderId)
     }
@@ -113,14 +124,16 @@ class AIAgentManager(private val context: Context) {
 
     fun setProjectRoot(projectPath: String): Boolean {
         val projectRoot = File(projectPath)
-        if (!projectRoot.exists()) return false
+        if (!projectRoot.isDirectory) return false
+        if (currentProjectRoot?.canonicalFile != projectRoot.canonicalFile) undoHistory.clear()
 
         currentProjectRoot = projectRoot
         val projectData = ProjectData(context)
         val projectTree = projectData.showProjectTree(projectRoot)
 
         currentAgent?.setProjectData(projectTree)
-        permissionManager.addAllowedDirectory(projectRoot.absolutePath)
+        permissionManager.getAllowedDirectories().forEach { permissionManager.removeAllowedDirectory(it) }
+        permissionManager.addAllowedDirectory(projectRoot.canonicalPath)
 
         return true
     }
@@ -129,7 +142,11 @@ class AIAgentManager(private val context: Context) {
         currentAgent?.clearConversation()
     }
 
-    suspend fun executeRequest(userRequest: String, callback: AIAgentCallback) {
+    suspend fun executeRequest(userRequest: String, callback: AIAgentCallback, allowEdits: Boolean = true) = requestMutex.withLock {
+        executeLocked(userRequest, callback, allowEdits)
+    }
+
+    private suspend fun executeLocked(userRequest: String, callback: AIAgentCallback, allowEdits: Boolean) {
         var success = false
         var providerSwitched = false
 
@@ -149,10 +166,11 @@ class AIAgentManager(private val context: Context) {
                     delay(1000)
                 }
 
-                val previousFileStates = captureCurrentFileStates()
+                val root = currentProjectRoot?.canonicalFile
+                val previousFileStates = if (allowEdits && root != null) withContext(Dispatchers.IO) { EditPlan.snapshot(root) } else emptyMap()
 
                 val result = currentAgent?.generateCode(
-                    prompt = userRequest,
+                    prompt = if (allowEdits) userRequest else "READ-ONLY MODE: do not use FILE_TO_MODIFY; answer only with analysis.\n\n$userRequest",
                     context = null,
                     language = "kotlin",
                     projectStructure = null
@@ -161,45 +179,34 @@ class AIAgentManager(private val context: Context) {
                 result.fold(
                     onSuccess = { response ->
                         
-                        if (response.contains("FILE_TO_MODIFY:")) {
-                            callback.onProcessing("Modifying files...")
-                            val modifications = processModifications(response, previousFileStates, callback)
-
-                            if (modifications.isNotEmpty()) {
-                                val allSuccessful = modifications.all { it.writeResult is FileWriteResult.Success }
-
-                                if (allSuccessful) {
-                                    val results = modifications.map { mod ->
-                                        val isNewFile = !previousFileStates.containsKey(mod.filePath)
-                                        ModificationResult(
-                                            filePath = mod.filePath,
-                                            content = mod.content,
-                                            success = true,
-                                            message = "Modified successfully",
-                                            isNewFile = isNewFile
-                                        )
-                                    }
-
-                                    val summary = createSummary(results)
-                                    callback.onSuccess(response, results, summary)
-                                    success = true
-                                } else {
-                                    callback.onProcessing("Some files failed. Retrying...")
-                                    currentAgent?.incrementAttemptCount()
-                                    delay(1500)
-                                }
+                        if (allowEdits && response.lineSequence().any { it.startsWith("FILE_TO_MODIFY: ") }) {
+                            success = true // Never automatically retry an approved write batch.
+                            if (root == null) {
+                                callback.onError("No active project.")
                             } else {
-                                callback.onProcessing("No files were modified. Retrying...")
-                                currentAgent?.incrementAttemptCount()
-                                delay(1500)
+                                val edits = try {
+                                    withContext(Dispatchers.IO) { EditPlan.parse(root, response, previousFileStates) }
+                                } catch (e: CancellationException) { throw e }
+                                  catch (e: Exception) {
+                                    callback.onError("Proposal rejected: ${e.message}. No files written.")
+                                    null
+                                }
+                                if (edits != null) when {
+                                    edits.isEmpty() -> callback.onTextResponse("No changes proposed.", ModificationSummary(0, 0, 0, 0, 0, emptyList()))
+                                    EditReviewDialog.confirm(context, root, edits) -> {
+                                        val results = applyReviewedEdits(root, edits, callback)
+                                        callback.onSuccess(response, results, createSummary(results))
+                                    }
+                                    else -> callback.onTextResponse("Changes rejected. No files written.", ModificationSummary(0, 0, 0, 0, 0, emptyList()))
+                                }
                             }
                         } else {
-                            val summary = ModificationSummary(0, 0, 0, 0, 0, emptyList())
-                            callback.onTextResponse(response, summary)
+                            callback.onTextResponse(response, ModificationSummary(0, 0, 0, 0, 0, emptyList()))
                             success = true
                         }
                     },
                   onFailure = { error ->
+                      if (error is CancellationException) throw error
                       android.util.Log.e("AIAgentManager", "Error occurred: ${error.message}", error)
                       
                       val shouldSwitchProvider = error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
@@ -253,7 +260,9 @@ class AIAgentManager(private val context: Context) {
                       }
                   }
                 )
-            } catch (e: Exception) {
+            } catch (e: CancellationException) { throw e }
+              catch (e: Exception) {
+                if (success) { callback.onError("Operation interrupted. Inspect any already applied files."); return }
                 android.util.Log.e("AIAgentManager", "Exception occurred: ${e.message}", e)
                 
                 if (currentAgent?.canRetry() == true) {
@@ -283,72 +292,28 @@ class AIAgentManager(private val context: Context) {
         return availableProviders.firstOrNull { it != currentProviderId }
     }
 
-    private suspend fun processModifications(
-        response: String,
-        previousFileStates: Map<String, String>,
-        callback: AIAgentCallback
-    ): List<BaseFileModification> {
-        val modifications = mutableListOf<BaseFileModification>()
-        val parser = SnippetParser()
-
-        if (response.contains("FILE_TO_MODIFY:")) {
-            val lines = response.lines()
-            var currentFile: String? = null
-            val contentBuilder = StringBuilder()
-            var inContent = false
-
-            for (line in lines) {
-                if (line.startsWith("FILE_TO_MODIFY:")) {
-                    if (currentFile != null && contentBuilder.isNotEmpty()) {
-                        val fileName = File(currentFile).name
-                        callback.onFileModifying(currentFile, fileName)
-
-                        val rawContent = contentBuilder.toString().trim()
-                        val cleanedContent = parser.cleanFileContent(rawContent)
-                        val previousContent = previousFileStates[currentFile]
-
-                        val writeResult = currentAgent?.writeFile(currentFile, cleanedContent)
-                            ?: FileWriteResult.Error("No agent initialized")
-
-                        val success = writeResult is FileWriteResult.Success
-                        currentAgent?.recordModification(currentFile, previousContent, cleanedContent, success)
-
-                        callback.onFileModified(currentFile, fileName, success)
-                        delay(300)
-
-                        modifications.add(BaseFileModification(currentFile, cleanedContent, writeResult))
-                    }
-
-                    currentFile = line.substringAfter("FILE_TO_MODIFY:").trim()
-                    contentBuilder.clear()
-                    inContent = true
-                } else if (inContent) {
-                    contentBuilder.append(line).append("\n")
+    private suspend fun applyReviewedEdits(root: File, edits: List<ProposedEdit>, callback: AIAgentCallback): List<ModificationResult> {
+        val results = mutableListOf<ModificationResult>()
+        val writer = AIFileWriter(context)
+        var stopped = false
+        for (edit in edits) {
+            callback.onFileModifying(edit.file.path, edit.file.name)
+            val result = if (stopped) FileWriteResult.Error("Not applied after previous failure")
+                else withContext(Dispatchers.IO) {
+                    if (currentProjectRoot?.canonicalFile != root || !EditPlan.unchanged(root, edit))
+                        FileWriteResult.Error("Project or file changed after review")
+                    else writer.writeFile(edit.file.path, edit.after, createBackup = true)
                 }
-            }
-
-            if (currentFile != null && contentBuilder.isNotEmpty()) {
-                val fileName = File(currentFile).name
-                callback.onFileModifying(currentFile, fileName)
-
-                val rawContent = contentBuilder.toString().trim()
-                val cleanedContent = parser.cleanFileContent(rawContent)
-                val previousContent = previousFileStates[currentFile]
-
-                val writeResult = currentAgent?.writeFile(currentFile, cleanedContent)
-                    ?: FileWriteResult.Error("No agent initialized")
-
-                val success = writeResult is FileWriteResult.Success
-                currentAgent?.recordModification(currentFile, previousContent, cleanedContent, success)
-
-                callback.onFileModified(currentFile, fileName, success)
-                delay(300)
-
-                modifications.add(BaseFileModification(currentFile, cleanedContent, writeResult))
-            }
+            val ok = result is FileWriteResult.Success
+            if (ok) {
+                undoHistory.add(edit)
+                currentAgent?.recordModification(edit.file.path, edit.before, edit.after, true)
+            } else stopped = true
+            results.add(ModificationResult(edit.file.path, edit.after, ok,
+                if (ok) "Applied" else "Not applied; inspect files", edit.before == null))
+            callback.onFileModified(edit.file.path, edit.file.name, ok)
         }
-
-        return modifications
+        return results
     }
 
     private fun formatErrorMessage(error: Throwable): String {
@@ -448,31 +413,18 @@ class AIAgentManager(private val context: Context) {
         )
     }
 
-    private fun captureCurrentFileStates(): Map<String, String> {
-        val states = mutableMapOf<String, String>()
-        val projectRoot = currentProjectRoot ?: return states
-
-        if (!projectRoot.exists()) return states
-
-        projectRoot.walkTopDown()
-            .filter { it.isFile }
-            .filter {
-                it.extension in listOf("kt", "java", "xml", "gradle", "kts") &&
-                !it.path.contains("/build/") &&
-                !it.path.contains("/.gradle/")
-            }
-            .forEach { file ->
-                try {
-                    states[file.absolutePath] = file.readText()
-                } catch (e: Exception) {
-                }
-            }
-
-        return states
-    }
-
     fun undoLastModification(): Boolean {
-        return currentAgent?.undoLastModification() ?: false
+        if (requestMutex.isLocked) return false
+        val edit = undoHistory.lastOrNull() ?: return false
+        val root = currentProjectRoot?.canonicalFile ?: return false
+        if (EditPlan.safeTarget(root, edit.file.path) != edit.file) return false
+        return try {
+            if (!edit.file.isFile || edit.file.readText() != edit.after) return false
+            val ok = if (edit.before == null) edit.file.delete()
+                else AIFileWriter(context).writeFile(edit.file.path, edit.before, createBackup = true) is FileWriteResult.Success
+            if (ok) undoHistory.removeAt(undoHistory.lastIndex)
+            ok
+        } catch (_: Exception) { false }
     }
 
     fun reinitializeWithSelectedModel() {

@@ -22,3 +22,10 @@
 - Existing provider credentials retain upstream storage; summaries are masked. Live provider and APK validation still pending.
 
 - Added connection test with a minimal prompt (no project context); removed cached credential use so clearing keys prevents new requests.
+
+## Review-first AI workflow
+
+- Mandatory before/after review and approval for manager-driven proposed edits; strict fenced complete-file parser, bounded snapshot, sensitive-path and conflict checks.
+- Atomic per-file writes, backup, stop after first failure, conflict-aware undo.
+- Read-only ask, code review, project analysis and pasted build-log modes. No automatic command execution or build.
+- Unit tests added; APK and device verification pending.

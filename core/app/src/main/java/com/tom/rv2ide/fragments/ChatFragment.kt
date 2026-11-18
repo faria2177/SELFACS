@@ -64,6 +64,7 @@ class ChatFragment : Fragment() {
     private lateinit var codeCompletionManager: CodeCompletionManager
     private lateinit var aiRequestHandler: AIRequestHandler
     
+    private var requestMode = 0
     private var typingJob: Job? = null
     private var fileMonitorJob: Job? = null
     private var completionStateMonitorJob: Job? = null
@@ -180,6 +181,22 @@ class ChatFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        val modes = arrayOf("Propose code edits", "Ask / explain", "Code review", "Project analysis", "Analyze build error")
+        val modeButton = requireView().findViewById<MaterialButton>(R.id.aiModeButton)
+        modeButton.text = modes[requestMode]
+        modeButton.setOnClickListener {
+            if (!executeBtn.isEnabled) return@setOnClickListener
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("AI task mode")
+                .setSingleChoiceItems(modes, requestMode) { dialog, index ->
+                    requestMode = index
+                    modeButton.text = modes[index]
+                    promptInput.hint = if (index == 4) "Paste Gradle build error or log here" else "Describe your request"
+                    dialog.dismiss()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
         executeBtn.setOnClickListener {
             val userRequest = promptInput.text.toString()
             
@@ -189,7 +206,14 @@ class ChatFragment : Fragment() {
             }
             
             codeCompletionManager.clearSuggestion()
-            aiRequestHandler.execute(userRequest)
+            val prefix = when (requestMode) {
+                1 -> "Explain without editing files. "
+                2 -> "Review code for bugs, security, compatibility and maintainability; prioritize findings. "
+                3 -> "Analyze architecture, modules, dependencies and risks; state missing context. "
+                4 -> "Analyze pasted build log, root cause, affected files and exact suggested fixes. Do not claim a build ran. "
+                else -> ""
+            }
+            aiRequestHandler.execute(prefix + userRequest, allowEdits = requestMode == 0)
         }
     
         clearBtn.setOnClickListener {

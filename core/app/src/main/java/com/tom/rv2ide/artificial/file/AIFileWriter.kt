@@ -63,7 +63,8 @@ class AIFileWriter(private val context: Context) {
         }
 
         // Backup existing file
-        if (file.exists() && createBackup && permissionManager.isAutoBackupEnabled()) {
+        val backupNeeded = file.exists() && createBackup
+        if (backupNeeded) {
             val backupResult = createBackup(file)
             if (backupResult is FileWriteResult.Error) {
                 return backupResult
@@ -72,8 +73,13 @@ class AIFileWriter(private val context: Context) {
 
         // Write the file
         return try {
-            file.writeText(content)
-            FileWriteResult.Success(filePath, backupCreated = createBackup && file.exists())
+            val parent = file.parentFile ?: return FileWriteResult.Error("Missing parent directory")
+            val temp = File.createTempFile(".selfacs-", ".tmp", parent)
+            try {
+                temp.writeText(content)
+                java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } finally { temp.delete() }
+            FileWriteResult.Success(filePath, backupCreated = backupNeeded)
         } catch (e: IOException) {
             FileWriteResult.Error("Failed to write file: ${e.message}")
         } catch (e: SecurityException) {
@@ -85,7 +91,7 @@ class AIFileWriter(private val context: Context) {
         return try {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
                 .format(Date())
-            val backupFileName = "${file.nameWithoutExtension}_backup_$timestamp.${file.extension}"
+            val backupFileName = "${file.nameWithoutExtension}_backup_${timestamp}_${java.util.UUID.randomUUID()}.${file.extension}"
             val backupFile = File(backupDir, backupFileName)
             
             file.copyTo(backupFile, overwrite = true)

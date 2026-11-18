@@ -33,7 +33,7 @@ class AIRequestHandler(
     
     private var executionJob: Job? = null
     
-    fun execute(userRequest: String) {
+    fun execute(userRequest: String, allowEdits: Boolean = true) {
         executionJob?.cancel()
         executionJob = lifecycleScope.launch {
             try {
@@ -45,9 +45,10 @@ class AIRequestHandler(
                     fileModificationList.visibility = View.GONE
                 }
                 
-                executeAIRequest(userRequest)
+                executeAIRequest(userRequest, allowEdits)
                 
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+              catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     executeBtn.isEnabled = true
                     progressIndicator.visibility = View.GONE
@@ -57,7 +58,7 @@ class AIRequestHandler(
         }
     }
     
-    private suspend fun executeAIRequest(userRequest: String) {
+    private suspend fun executeAIRequest(userRequest: String, allowEdits: Boolean) {
         aiAgent.executeRequest(userRequest, object : AIAgentManager.AIAgentCallback {
             override fun onProcessing(message: String) {
                 lifecycleScope.launch(Dispatchers.Main) {
@@ -114,7 +115,7 @@ class AIRequestHandler(
                     statusText.text = "🔄 Retry #$attemptNumber: $message"
                 }
             }
-        })
+        }, allowEdits = allowEdits)
     }
     
     private fun handleSuccess(
@@ -123,14 +124,14 @@ class AIRequestHandler(
         summary: AIAgentManager.ModificationSummary
     ) {
         progressIndicator.visibility = View.GONE
-        statusText.text = "✅ Operation completed"
+        statusText.text = if (summary.failedFiles == 0) "✅ Approved changes applied" else "⚠️ Some changes were not applied. Review summary."
         summaryText.text = buildSummaryText(summary)
         summaryCard.visibility = View.VISIBLE
         
         if (modifications.isNotEmpty()) {
-            val firstMod = modifications.first()
-            val file = File(firstMod.filePath)
-            if (file.exists()) {
+            val firstMod = modifications.firstOrNull { it.success }
+            val file = firstMod?.let { File(it.filePath) }
+            if (file != null && file.exists()) {
                 onFileOpen(file.name)
             }
         }
