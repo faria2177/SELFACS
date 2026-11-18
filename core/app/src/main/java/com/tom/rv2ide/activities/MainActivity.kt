@@ -49,7 +49,6 @@ import java.io.File
 
 class MainActivity : EdgeToEdgeIDEActivity() {
 
-  private lateinit var tomIDEUpdater: TomIDEUpdater
   private val viewModel by viewModels<MainViewModel>()
   private var _binding: ActivityMainBinding? = null
 
@@ -81,8 +80,9 @@ class MainActivity : EdgeToEdgeIDEActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    tomIDEUpdater = TomIDEUpdater(this)
-    tomIDEUpdater.checkForUpdates()
+    if (savedInstanceState == null) {
+      com.tom.rv2ide.updates.SelfacsUpdateUi.checkOnLaunch(this)
+    }
 
     openLastProject()
 
@@ -211,7 +211,6 @@ class MainActivity : EdgeToEdgeIDEActivity() {
   }
 
   override fun onDestroy() {
-    tomIDEUpdater.cancelDownload()
     ITemplateProvider.getInstance().release()
     super.onDestroy()
     _binding = null

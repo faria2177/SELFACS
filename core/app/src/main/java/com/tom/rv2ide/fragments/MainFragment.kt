@@ -118,6 +118,7 @@ class MainFragment : BaseFragment() {
 
               MainScreenAction.ACTION_FLUTTER_STUDIO -> startActivity(Intent(requireActivity(), com.tom.rv2ide.flutter.FlutterStudioActivity::class.java))
               MainScreenAction.ACTION_TOOLCHAIN_STATUS -> showToolchainStatus()
+              MainScreenAction.ACTION_UPDATES -> startActivity(Intent(requireActivity(), com.tom.rv2ide.updates.SelfacsUpdatesActivity::class.java))
               MainScreenAction.ACTION_PREFERENCES -> gotoPreferences()
               MainScreenAction.ACTION_DONATE -> {
                 startActivity(Intent(requireActivity(), IDEConfigurations::class.java))

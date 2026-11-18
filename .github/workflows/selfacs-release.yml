@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0)"
-        required: true
+        description: "Release tag vX.Y.Z (leave blank = auto: next patch version)"
+        required: false
+        default: ""
       prerelease:
         description: "Mark as pre-release"
         type: boolean
@@ -33,6 +34,42 @@ jobs:
           submodules: recursive
           fetch-depth: 0
           persist-credentials: false
+      - name: Resolve release version
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          tags=$(gh api "repos/$GH_REPO/releases?per_page=100" -q '.[].tag_name' | grep -E '^v[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$' | sort -V || true)
+          prev=$(echo "$tags" | tail -n1)
+          if [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          elif [ -n "$prev" ]; then
+            IFS=. read -r ma mi pa <<< "${prev#v}"
+            tag="v$ma.$mi.$((pa + 1))"
+            if [ $((pa + 1)) -gt 99 ]; then tag="v$ma.$((mi + 1)).0"; fi
+          else
+            tag="v0.1.0"
+          fi
+          if ! [[ "$tag" =~ ^v([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{1,2})$ ]]; then
+            echo "::error::Tag must look like vX.Y.Z (each part 0-99): $tag"; exit 1
+          fi
+          ma=${BASH_REMATCH[1]}; mi=${BASH_REMATCH[2]}; pa=${BASH_REMATCH[3]}
+          if [ "$DRY_RUN" != "true" ] && gh api "repos/$GH_REPO/git/refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists"; exit 1
+          fi
+          # Must match SelfacsVersion.baseVersionCode in the app.
+          code=$((2000 + (10#$ma * 10000 + 10#$mi * 100 + 10#$pa) * 10))
+          {
+            echo "tag=$tag"
+            echo "version=$((10#$ma)).$((10#$mi)).$((10#$pa))"
+            echo "code=$code"
+            echo "prev=$prev"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release $tag (versionCode $code, previous: ${prev:-none})"
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -107,7 +144,11 @@ jobs:
             echo "SIGNING_KEY_ALIAS=$KEY_ALIAS"
           } >> "$GITHUB_ENV"
       - name: Assemble release APK
-        run: ./gradlew :core:app:assembleRelease --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
+        run: >-
+          ./gradlew :core:app:assembleRelease --stacktrace --no-daemon
+          -DMAIN_VERSION=${{ steps.ver.outputs.version }} -DREVISION_NUM=05
+          -DANDROID_VERSION_CODE=${{ steps.ver.outputs.code }}
+          -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=${{ steps.ver.outputs.code }}
       - name: Verify signatures and rename
         id: apks
         run: |
@@ -138,19 +179,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          PREV: ${{ steps.ver.outputs.prev }}
+          CODE: ${{ steps.ver.outputs.code }}
           PRE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
           sha=$(git rev-parse HEAD)
-          cat > notes.md <<EOF
-          SELFACS signed release build.
-
-          - Source commit: \`$sha\`
-          - CI run: https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID
-          - Signed with the SELFACS release key. A debug build installed earlier must be uninstalled first (different signature).
-          - Device testing is still in progress; see project.md for verification status.
-          EOF
+          range="HEAD"
+          if [ -n "$PREV" ] && git rev-parse -q --verify "refs/tags/$PREV" >/dev/null; then range="$PREV..HEAD"; fi
+          changes=$(git log --no-merges --pretty='- %s' "$range" | grep -viE '^- (update|record|document) project status|^- docs?:' | head -n 40 || true)
+          [ -n "$changes" ] || changes="- Maintenance build"
+          {
+            echo "## What's new"
+            echo
+            echo "$changes"
+            echo
+            echo "---"
+            echo "versionCode $CODE · commit \`${sha:0:7}\` · [CI run](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID)"
+            echo
+            echo "Signed with the SELFACS release key. Builds signed with a different key (e.g. debug builds) must be uninstalled first."
+          } > notes.md
           flag=""; [ "$PRE" = "true" ] && flag="--prerelease"
           gh release create "$TAG" out/*.apk out/SHA256SUMS.txt --target "$sha" $flag \
             --title "SELFACS $TAG" --notes-file notes.md

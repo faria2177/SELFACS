@@ -49,6 +49,7 @@ constructor(
     const val ACTION_DOCS = 6
     const val ACTION_TOOLCHAIN_STATUS = 7
     const val ACTION_FLUTTER_STUDIO = 8
+    const val ACTION_UPDATES = 9
 
     /** Get all main screen actions. */
     @JvmStatic
@@ -89,6 +90,7 @@ constructor(
             donate,
             preferences,
             docs,
+            MainScreenAction(ACTION_UPDATES, R.string.selfacs_updates, R.drawable.ic_sync),
         )
       }
     }

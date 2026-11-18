@@ -75,6 +75,7 @@
       android:launchMode="singleTop"
       android:name=".activities.editor.EditorActivityKt" />
     <activity android:name=".flutter.FlutterStudioActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
+    <activity android:name=".updates.SelfacsUpdatesActivity" android:exported="false" android:theme="@style/Theme.AndroidIDE" android:configChanges="orientation|screenSize|keyboardHidden" />
     <activity android:name=".activities.GitHubStudioActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
     <activity android:name=".activities.PreferencesActivity" />
     <activity android:name=".activities.AboutActivity" />
