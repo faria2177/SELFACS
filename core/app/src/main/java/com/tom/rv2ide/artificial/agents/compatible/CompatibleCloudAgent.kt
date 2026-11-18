@@ -29,6 +29,7 @@ class CompatibleCloudAgent(private val provider: CloudProviders.Provider) : AIAg
     override fun setProjectData(projectTreeResult: ProjectTreeResult) { project = projectTreeResult }
     override fun clearConversation() { history.clear(); attempts = 0 }
     override fun isInitialized() = activeConfig() != null
+    override val keepsConversation: Boolean get() = false
     override fun resetAttemptCount() { attempts = 0 }
     override fun incrementAttemptCount() { attempts++ }
     override fun getCurrentAttemptCount() = attempts

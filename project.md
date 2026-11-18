@@ -94,7 +94,7 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 
 ### P1 — Android Code Studio core usability
 - [ ] SELFACS নাম, icon, About, settings ও user-facing strings-এ upstream branding audit।
-- [ ] Package/application ID migration পরিকল্পনা, সব hardcoded upstream references যাচাই করে ধাপে ধাপে পরিবর্তন।
+- [~] Package/application ID migration — **২০২৬-১১-১৮ সিদ্ধান্ত: আপাতত `com.tom.rv2ide` রাখা হলো।** কারণ: Termux bootstrap-এর ৬৩০টা ফাইলে (৩০৯টা ELF binary) `/data/data/com.tom.rv2ide` prefix compiled; ID বদলালে terminal/JDK/Gradle ভাঙবে। ভবিষ্যৎ বিকল্প: (ক) same-length ID (যেমন `io.selfacs.ide`) + binary prefix patch, (খ) termux-packages দিয়ে নতুন prefix-এ bootstrap ও toolchain rebuild। ID বদলালে বর্তমান install-এ in-app update যাবে না।
 - [ ] Project create/open/import/export এবং file tree workflow বাস্তব ডিভাইসে যাচাই।
 - [ ] Editor tabs, syntax highlighting, search/replace, terminal, diagnostics ও language server integration regression test।
 - [ ] Gradle sync/build/install/logcat workflow নির্ভরযোগ্য করা।
@@ -102,6 +102,8 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [ ] Keyboard, touch, external keyboard এবং বিভিন্ন screen size-এ UI পরীক্ষা।
 
 ### P2 — AI Studio completion
+- [x] Agent tools (ধাপ ১): AI নিজে `READ_FILE` / `LIST_DIR` / `SEARCH` দিয়ে project থেকে তথ্য নেয়, সর্বোচ্চ ৬ round, read-only; path project-এ সীমিত, hidden/build/secret ফাইল বাদ; edit-এর আগে ফাইল পড়ার নিয়ম। `AgentToolsTest`।
+- [ ] Agent ধাপ ২: user অনুমতিতে build চালানো ও build error দেখে fix loop; streaming; chat/session persistence।
 - [ ] প্রতিটি provider-এর real connection test ও model compatibility matrix।
 - [ ] Streaming response, timeout, retry, rate-limit/quota এবং network error handling।
 - [ ] Provider/model selector ও usage/error status UX উন্নত করা।

@@ -53,6 +53,9 @@ interface AIAgent {
     
     fun writeFile(filePath: String, content: String): FileWriteResult
     fun isInitialized(): Boolean
+
+    /** True if the agent keeps earlier turns itself (then agent rounds send only new tool results). */
+    val keepsConversation: Boolean get() = true
 }
 
 data class ModificationAttempt(

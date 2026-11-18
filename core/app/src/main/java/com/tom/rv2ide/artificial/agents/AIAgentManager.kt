@@ -17,6 +17,10 @@
 
 package com.tom.rv2ide.artificial.agents
 
+import com.tom.rv2ide.artificial.agentic.AgentTools
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
+
 import android.content.Context
 import com.tom.rv2ide.artificial.agents.google.Gemini
 import com.tom.rv2ide.artificial.agents.openai.OpenAI
@@ -167,12 +171,8 @@ class AIAgentManager(private val context: Context) {
                 val root = currentProjectRoot?.canonicalFile
                 val previousFileStates = if (allowEdits && root != null) withContext(Dispatchers.IO) { EditPlan.snapshot(root) } else emptyMap()
 
-                val result = currentAgent?.generateCode(
-                    prompt = if (allowEdits) userRequest else "READ-ONLY MODE: do not use FILE_TO_MODIFY; answer only with analysis.\n\n$userRequest",
-                    context = null,
-                    language = "kotlin",
-                    projectStructure = null
-                ) ?: Result.failure(Exception("No agent initialized"))
+                val basePrompt = if (allowEdits) userRequest else "READ-ONLY MODE: do not use FILE_TO_MODIFY; answer only with analysis.\n\n$userRequest"
+                val result = runAgentLoop(basePrompt, root, callback)
 
                 result.fold(
                     onSuccess = { response ->
@@ -283,6 +283,47 @@ class AIAgentManager(private val context: Context) {
           val attemptCount = currentAgent?.getCurrentAttemptCount() ?: 0
           val agentName = currentAgent?.providerName ?: "No agent initialized"
           callback.onError("Failed after $attemptCount attempts with $agentName.\n\nPlease check your API key and try again.")
+        }
+    }
+
+    /**
+     * Lets the model gather project information with read-only tool lines (READ_FILE / LIST_DIR /
+     * SEARCH) for up to [AgentTools.MAX_ROUNDS] rounds before its final answer. No writes or commands.
+     */
+    private suspend fun runAgentLoop(basePrompt: String, root: File?, callback: AIAgentCallback): Result<String> {
+        val agent = currentAgent ?: return Result.failure(Exception("No agent initialized"))
+        val gathered = mutableListOf<Pair<AgentTools.Call, String>>()
+        var latest = emptyList<Pair<AgentTools.Call, String>>()
+        var round = 0
+        while (true) {
+            coroutineContext.ensureActive()
+            val prompt = when {
+                root == null -> basePrompt
+                round == 0 -> basePrompt + "\n\n" + AgentTools.protocol(root, round)
+                // Agents with their own history already saw the request and earlier results.
+                agent.keepsConversation ->
+                    AgentTools.observations(latest) + "\n" + AgentTools.protocol(root, round) +
+                        "\nContinue the same task."
+                else -> basePrompt + "\n\n" + AgentTools.protocol(root, round) + "\n" + AgentTools.observations(gathered)
+            }
+            val result = agent.generateCode(prompt = prompt, context = null, language = "kotlin", projectStructure = null)
+            val response = result.getOrElse { return Result.failure(it) }
+            val calls = if (root != null && round < AgentTools.MAX_ROUNDS - 1) AgentTools.parseCalls(response) else emptyList()
+            if (calls.isEmpty()) return Result.success(response)
+            val thisRound = mutableListOf<Pair<AgentTools.Call, String>>()
+            for (call in calls) {
+                callback.onProcessing(when (call.kind) {
+                    AgentTools.Kind.READ_FILE -> "📖 Reading ${call.arg}"
+                    AgentTools.Kind.LIST_DIR -> "📂 Listing ${call.arg}"
+                    AgentTools.Kind.SEARCH -> "🔎 Searching \"${call.arg.take(40)}\""
+                })
+                val observation = withContext(Dispatchers.IO) { AgentTools.run(root!!, call) }
+                gathered.removeAll { it.first == call }
+                gathered.add(call to observation)
+                thisRound.add(call to observation)
+            }
+            latest = thisRound
+            round++
         }
     }
 
