@@ -52,6 +52,11 @@ jobs:
         with:
           java-version: '21'
           distribution: temurin
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk/27.1.12297006
+          key: android-ndk-27.1.12297006
       - name: Install required Android SDK
         run: |
           set -euo pipefail
