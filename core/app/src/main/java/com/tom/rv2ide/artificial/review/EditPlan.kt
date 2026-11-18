@@ -56,7 +56,7 @@ object EditPlan {
             val path = lines[i++].removePrefix("FILE_TO_MODIFY: ").trim()
             val file = safeTarget(root, path) ?: error("Rejected path: $path")
             require(used.add(file.path) && used.size <= 20) { "Duplicate or too many proposed files" }
-            require(i < lines.size && Regex("^\x60\x60\x60[\\w.+-]*$").matches(lines[i])) { "Missing opening code fence" }
+            require(i < lines.size && Regex("^```[\\w.+-]*$").matches(lines[i])) { "Missing opening code fence" }
             i++
             val buffer = mutableListOf<String>()
             while (i < lines.size && lines[i] != "```") buffer.add(lines[i++])

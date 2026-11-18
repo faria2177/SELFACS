@@ -25,7 +25,6 @@ import com.tom.rv2ide.artificial.agents.grok.Grok
 import com.tom.rv2ide.artificial.agents.deepseek.DeepSeek
 import com.tom.rv2ide.artificial.agents.local.LocalLLM
 import com.tom.rv2ide.artificial.file.FileWriteResult
-import com.tom.rv2ide.artificial.parser.SnippetParser
 import com.tom.rv2ide.artificial.permissions.AIPermissionManager
 import com.tom.rv2ide.artificial.project.awareness.ProjectData
 import com.tom.rv2ide.artificial.secrets.ApiKey
@@ -48,7 +47,6 @@ import com.tom.rv2ide.artificial.dialogs.ProviderSwitchDialog
 
 class AIAgentManager(private val context: Context) {
 
-    private val snippetParser = SnippetParser()
     private val permissionManager = AIPermissionManager(context)
     private var currentProjectRoot: File? = null
     private var currentProviderId: String = Agents(context).getProvider()
@@ -204,6 +202,7 @@ class AIAgentManager(private val context: Context) {
                             callback.onTextResponse(response, ModificationSummary(0, 0, 0, 0, 0, emptyList()))
                             success = true
                         }
+                        Unit
                     },
                   onFailure = { error ->
                       if (error is CancellationException) throw error

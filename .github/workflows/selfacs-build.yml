@@ -91,6 +91,8 @@ jobs:
             ./gradlew :editor:publishToMavenLocal -I "$RUNNER_TEMP/no-sign.init.gradle" --stacktrace
           )
           find . -name libs.versions.toml -not -path '*/build/*' -exec sed -i 's/^\(editor = \)"0.24.7-acs"/\1"0.24.7-acs-SNAPSHOT"/' {} +
+      - name: Test AI edit planner
+        run: ./gradlew :core:app:testDebugUnitTest --tests com.tom.rv2ide.artificial.review.EditPlanTest --stacktrace --no-daemon
       - name: Assemble debug APK
         run: |
           ./gradlew :core:app:assembleDebug --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
