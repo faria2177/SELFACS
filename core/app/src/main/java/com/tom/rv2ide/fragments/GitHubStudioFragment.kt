@@ -344,9 +344,12 @@ class GitHubStudioFragment : Fragment() {
                 val result = withContext(Dispatchers.IO) { task() }
                 busy = false
                 success(result)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
-                busy = false
                 status.text = error.message ?: "GitHub operation failed."
+            } finally {
+                busy = false
             }
         }
     }

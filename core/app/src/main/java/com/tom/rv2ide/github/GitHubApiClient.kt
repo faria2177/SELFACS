@@ -2,6 +2,7 @@ package com.tom.rv2ide.github
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import java.io.IOException
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -55,15 +56,13 @@ class GitHubApiClient(private val token: String) {
     init { require(GitHubValidation.isValidToken(token)) { "Invalid token format" } }
 
     fun authenticatedUser(): GitHubUser {
-        val json = request("/user")
+        val json = requestObject("/user")
         return GitHubUser(json.optString("login"), json.optString("name").ifBlank { json.optString("login") })
     }
 
     fun repositories(): List<GitHubRepository> {
-        val array = request("/user/repos?per_page=100&sort=updated&direction=desc").optJSONArray("items")
-            ?: JSONArray()
-        return array.mapNotNull { value ->
-            val item = value as? JSONObject ?: return@mapNotNull null
+        val array = requestArray("/user/repos?per_page=100&sort=updated&direction=desc")
+        return array.mapObjects { item ->
             val full = item.optString("full_name")
             val parts = full.split('/')
             if (parts.size != 2 || !GitHubValidation.isValidOwnerOrRepo(parts[0]) ||
@@ -77,10 +76,8 @@ class GitHubApiClient(private val token: String) {
     }
 
     fun branches(repo: GitHubRepository): List<GitHubBranch> {
-        val array = request("/repos/${part(repo.owner)}/${part(repo.name)}/branches?per_page=100")
-            .optJSONArray("items") ?: JSONArray()
-        return array.mapNotNull { value ->
-            val item = value as? JSONObject ?: return@mapNotNull null
+        val array = requestArray("/repos/${part(repo.owner)}/${part(repo.name)}/branches?per_page=100")
+        return array.mapObjects { item ->
             val name = item.optString("name")
             if (!GitHubValidation.isValidBranch(name)) return@mapNotNull null
             GitHubBranch(name, item.optJSONObject("commit")?.optString("sha").orEmpty())
@@ -88,10 +85,9 @@ class GitHubApiClient(private val token: String) {
     }
 
     fun workflows(repo: GitHubRepository): List<GitHubWorkflow> {
-        val array = request("/repos/${part(repo.owner)}/${part(repo.name)}/actions/workflows?per_page=100")
-            .optJSONObject("items")?.optJSONArray("workflows") ?: JSONArray()
-        return array.mapNotNull { value ->
-            val item = value as? JSONObject ?: return@mapNotNull null
+        val array = requestObject("/repos/${part(repo.owner)}/${part(repo.name)}/actions/workflows?per_page=100")
+            .optJSONArray("workflows") ?: JSONArray()
+        return array.mapObjects { item ->
             val id = item.optLong("id")
             if (id <= 0) return@mapNotNull null
             GitHubWorkflow(id, item.optString("name"), item.optString("path"), item.optString("state"))
@@ -99,10 +95,9 @@ class GitHubApiClient(private val token: String) {
     }
 
     fun runs(repo: GitHubRepository): List<GitHubRun> {
-        val array = request("/repos/${part(repo.owner)}/${part(repo.name)}/actions/runs?per_page=25")
-            .optJSONObject("items")?.optJSONArray("workflow_runs") ?: JSONArray()
-        return array.mapNotNull { value ->
-            val item = value as? JSONObject ?: return@mapNotNull null
+        val array = requestObject("/repos/${part(repo.owner)}/${part(repo.name)}/actions/runs?per_page=25")
+            .optJSONArray("workflow_runs") ?: JSONArray()
+        return array.mapObjects { item ->
             val id = item.optLong("id")
             if (id <= 0) return@mapNotNull null
             GitHubRun(
@@ -114,10 +109,9 @@ class GitHubApiClient(private val token: String) {
     }
 
     fun artifacts(repo: GitHubRepository): List<GitHubArtifact> {
-        val array = request("/repos/${part(repo.owner)}/${part(repo.name)}/actions/artifacts?per_page=100")
-            .optJSONArray("items") ?: JSONArray()
-        return array.mapNotNull { value ->
-            val item = value as? JSONObject ?: return@mapNotNull null
+        val array = requestObject("/repos/${part(repo.owner)}/${part(repo.name)}/actions/artifacts?per_page=100")
+            .optJSONArray("artifacts") ?: JSONArray()
+        return array.mapObjects { item ->
             val id = item.optLong("id")
             if (id <= 0) return@mapNotNull null
             GitHubArtifact(id, item.optString("name"), item.optLong("size_in_bytes"),
@@ -185,7 +179,13 @@ class GitHubApiClient(private val token: String) {
         }
     }
 
-    private fun request(path: String, method: String = "GET", body: JSONObject? = null): JSONObject {
+    private fun requestObject(path: String, method: String = "GET", body: JSONObject? = null): JSONObject =
+        request(path, method, body) as? JSONObject ?: throw IOException("Unexpected GitHub API response")
+
+    private fun requestArray(path: String): JSONArray =
+        request(path) as? JSONArray ?: throw IOException("Unexpected GitHub API response")
+
+    private fun request(path: String, method: String = "GET", body: JSONObject? = null): Any {
         require(path.startsWith("/") && !path.startsWith("//")) { "Invalid API path" }
         val connection = (URL("https://api.github.com$path").openConnection() as HttpURLConnection).apply {
             requestMethod = method
@@ -219,7 +219,7 @@ class GitHubApiClient(private val token: String) {
                 val message = runCatching { JSONObject(text).optString("message") }.getOrNull().orEmpty()
                 throw IOException("GitHub API HTTP $code: ${message.ifBlank { "Request failed" }.take(240)}")
             }
-            return if (text.isBlank()) JSONObject() else JSONObject(text)
+            return if (text.isBlank()) JSONObject() else JSONTokener(text).nextValue() ?: JSONObject()
         } finally {
             connection.disconnect()
         }
@@ -236,5 +236,11 @@ class GitHubApiClient(private val token: String) {
     }
 }
 
-private fun JSONArray.mapNotNull(transform: (Any) -> GitHubRepository?): List<GitHubRepository> =
-    (0 until length()).mapNotNull { index -> transform(get(index)) }
+private inline fun <T : Any> JSONArray.mapObjects(transform: (JSONObject) -> T?): List<T> {
+    val result = mutableListOf<T>()
+    for (index in 0 until length()) {
+        val item = optJSONObject(index) ?: continue
+        transform(item)?.let(result::add)
+    }
+    return result
+}
