@@ -242,7 +242,7 @@ dependencies {
   implementation(libs.androidx.grid)
   implementation(libs.androidx.nav.fragment)
   implementation(libs.androidx.nav.ui)
-  implementation(libs.androidx.preference)\n  implementation("androidx.security:security-crypto:1.1.0-alpha06")
+  implementation(libs.androidx.preference)
   implementation(libs.androidx.recyclerview)
   implementation(libs.androidx.transition)
   implementation(libs.androidx.vectors)
