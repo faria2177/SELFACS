@@ -36,3 +36,11 @@
 - Bounded ZIP import/export, path validation, conflict checks, common sensitive/generated file exclusions.
 - Explicit GitHub Actions template generation for Flutter analysis, tests and debug APK. Export and push to a separate repository manually; no Flutter SDK bundled, no direct Actions dispatch, no Dart analysis server yet.
 - Workspace unit tests included; Android integration and device testing pending.
+
+## GitHub Studio
+
+- Added encrypted fine-grained personal access token storage using Android Keystore-backed EncryptedSharedPreferences.
+- Added GitHub account and repository listing, remote branch browsing, workflow listing and manual workflow dispatch, recent run history, artifact listing and ZIP download.
+- Added GitHub Studio entry in the Git client and a standalone entry when no local Git repository is initialized.
+- Existing JGit local clone/commit/push/pull/branch features remain available. Repository creation opens GitHub's official web flow; this app does not create repositories through an over-privileged token.
+- Token is never written to logs or forwarded to artifact redirect hosts. API permissions depend on the user's fine-grained token. Android build and device verification pending.

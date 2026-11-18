@@ -20,4 +20,8 @@
         android:id="@+id/nav_settings"
         android:icon="@drawable/ic_settings"
         android:title="@string/sidebar_git_settings_msg"/>
+    <item
+        android:id="@+id/nav_github"
+        android:icon="@drawable/ic_git"
+        android:title="@string/selfacs_github_studio"/>
 </menu>

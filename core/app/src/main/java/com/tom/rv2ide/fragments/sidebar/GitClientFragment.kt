@@ -120,6 +120,7 @@ class GitClientFragment : Fragment() {
                 R.id.nav_branches -> 2
                 R.id.nav_remotes -> 3
                 R.id.nav_settings -> 4
+                R.id.nav_github -> 5
                 else -> 0
             }
             binding.viewPager.currentItem = position
@@ -134,6 +135,7 @@ class GitClientFragment : Fragment() {
                     2 -> R.id.nav_branches
                     3 -> R.id.nav_remotes
                     4 -> R.id.nav_settings
+                    5 -> R.id.nav_github
                     else -> R.id.nav_changes
                 }
                 binding.navigationRail.selectedItemId = itemId
@@ -142,7 +144,7 @@ class GitClientFragment : Fragment() {
     }
     
     private inner class ViewPagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment) {
-        override fun getItemCount(): Int = 5
+        override fun getItemCount(): Int = 6
         
         override fun createFragment(position: Int): Fragment {
             return when (position) {
@@ -151,6 +153,7 @@ class GitClientFragment : Fragment() {
                 2 -> BranchesFragment()
                 3 -> RemotesFragment()
                 4 -> SettingsFragment()
+                5 -> GitHubStudioFragment()
                 else -> ChangesFragment()
             }
         }
