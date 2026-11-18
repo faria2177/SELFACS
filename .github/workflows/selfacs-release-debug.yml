@@ -1,0 +1,61 @@
+name: SELFACS debug release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Successful 'SELFACS import and debug APK' run ID"
+        required: true
+      tag:
+        description: "Release tag (e.g. v0.1.0-debug.1)"
+        required: true
+      abi:
+        description: "APK ABI to publish"
+        required: true
+        default: "arm64-v8a"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download debug APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SELFACS-debug-apks
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: apks
+
+      - name: Select APK
+        id: pick
+        run: |
+          ls -la apks
+          src=$(find apks -name "*${{ inputs.abi }}*.apk" | head -n1)
+          if [ -z "$src" ]; then echo "No APK for ${{ inputs.abi }}"; exit 1; fi
+          out="selfacs-${{ inputs.abi }}-debug.apk"
+          cp "$src" "$out"
+          sha256sum "$out" > "$out.sha256"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha=$(gh api repos/$GH_REPO/actions/runs/${{ inputs.run_id }} -q .head_sha)
+          cat > notes.md <<EOF
+          SELFACS debug build (pre-release, not a verified stable release).
+
+          - Source commit: \`$sha\`
+          - CI run: https://github.com/$GH_REPO/actions/runs/${{ inputs.run_id }}
+          - ABI: ${{ inputs.abi }}
+          - Signed with the standard debug key. Device testing is still pending.
+          EOF
+          gh release create "${{ inputs.tag }}" \
+            "${{ steps.pick.outputs.file }}" "${{ steps.pick.outputs.file }}.sha256" \
+            --target "$sha" --prerelease \
+            --title "SELFACS ${{ inputs.tag }}" --notes-file notes.md
