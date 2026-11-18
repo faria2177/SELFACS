@@ -28,6 +28,8 @@ import com.tom.rv2ide.resources.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.google.android.material.R as MR
 
 /** Shared view helpers + launch prompt + download dialog for the SELFACS updater. */
@@ -260,6 +262,8 @@ object SelfacsUpdateUi {
           try {
             val file =
                 updater.download(candidate) { percent, done, total ->
+                  // download() reports from an IO thread; views must only be touched on the main thread.
+                  withContext(Dispatchers.Main) {
                   if (percent >= 0) {
                     bar.isIndeterminate = false
                     bar.setProgressCompat(percent, true)
@@ -270,6 +274,7 @@ object SelfacsUpdateUi {
                   if (total > 0) {
                     statusText.text =
                         "%.0f / %.0f MB · installing when ready…".format(done / 1048576.0, total / 1048576.0)
+                  }
                   }
                 }
             statusText.text = "Verified"
