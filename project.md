@@ -112,7 +112,11 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [x] Updater fix (v0.1.5): download progress UI main thread-এ।
 - [x] Device bug: OpenRouter-এ "Failed after 2 attempts… check your API key" — আসল কারণ লুকানো ছিল। Fix: provider-এর error message (key মুছে) দেখানো, 404/400 ইত্যাদি retry না করা, শেষ error সহ বার্তা, সাধারণ সমস্যায় সমাধানের ইঙ্গিত (OpenRouter privacy/data policy, ভুল model ID, context বড়)। Reasoning-only/empty উত্তর আলাদা করে চেনা।
 - [x] Device: logger fix কাজ করেছে — `Bulk_SMS_Sender_Pro` "CONFIGURE SUCCESSFUL"।
-- [ ] Agent ধাপ ৩খ: streaming response; rate limit-এ Retry-After অনুযায়ী অপেক্ষা ও পুনরায় চেষ্টা।
+- [x] Multi-model providers: model ঘরে কমা দিয়ে একাধিক model; একটা ব্যর্থ হলে (429/404/5xx/timeout/খালি উত্তর) পরেরটা, key/billing/network-এ থামে। OpenRouter-এ "Choose free models" (public catalog থেকে free model, coder আগে, Select all); Test connection প্রতিটা model আলাদা পরীক্ষা করে ও ব্যর্থগুলো সরানোর অপশন। `ModelListTest`।
+- [x] "Check all AI providers" (AI settings): সব configured provider ও প্রতিটা model সমান্তরালে পরীক্ষা, ✅/❌ ও সময়, ব্যর্থ model সরানো; ফল মনে রাখা হয়।
+- [x] Auto-switch default চালু; ব্যর্থ হলে বাকি সব provider একে একে (সম্প্রতি কাজ করা আগে, ৩০ মিনিটের মধ্যে ব্যর্থ শেষে)।
+- [x] DeepAI: যোগ করা হয়নি — official API-তে chat/text endpoint নেই, API-র জন্য Pro লাগে; "free chat" কোড অননুমোদিত internal endpoint ব্যবহার করে।
+- [ ] Agent ধাপ ৩খ: streaming response; rate limit-এ Retry-After অনুযায়ী অপেক্ষা।
 - [ ] প্রতিটি provider-এর real connection test ও model compatibility matrix।
 - [ ] Streaming response, timeout, retry, rate-limit/quota এবং network error handling।
 - [ ] Provider/model selector ও usage/error status UX উন্নত করা।

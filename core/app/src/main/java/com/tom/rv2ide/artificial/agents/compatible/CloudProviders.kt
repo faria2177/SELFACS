@@ -10,7 +10,10 @@ import java.net.URI
 /** Additional OpenAI-compatible providers. No credentials are bundled in the app. */
 object CloudProviders {
     data class Provider(val id: String, val name: String, val endpoint: String, val keyPage: String)
-    data class Config(val key: String, val model: String, val endpoint: String)
+    /** [model] may hold several model IDs (comma separated); they are tried in order. */
+    data class Config(val key: String, val model: String, val endpoint: String) {
+        val models: List<String> get() = ModelList.parse(model)
+    }
 
     val all = listOf(
         Provider("groq", "Groq", "https://api.groq.com/openai/v1/chat/completions", "https://console.groq.com/keys"),
@@ -47,10 +50,11 @@ object CloudProviders {
 
     fun save(context: Context, provider: Provider, config: Config) {
         require(config.key.isNotBlank() && config.key.length <= 4096 && config.key.none { it.isWhitespace() })
-        require(config.model.isNotBlank() && config.model.length <= 200 && config.model.none { it.isWhitespace() })
+        val models = config.models
+        require(ModelList.isValid(models))
         require(validEndpoint(provider, config.endpoint))
         check(storage(context).edit().putString("${provider.id}.key", config.key)
-            .putString("${provider.id}.model", config.model)
+            .putString("${provider.id}.model", ModelList.join(models))
             .putString("${provider.id}.endpoint", config.endpoint).commit()) { "Credential storage failed" }
     }
 

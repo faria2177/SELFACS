@@ -33,7 +33,7 @@ class ProviderSwitchDialog(private val context: Context) {
     
     
     fun isAutoSwitchEnabled(): Boolean {
-        return sp.getBoolean(AUTO_SWITCH_KEY, false)
+        return sp.getBoolean(AUTO_SWITCH_KEY, true) // SELFACS: switch automatically unless the user turns it off
     }
     
     fun setAutoSwitch(enabled: Boolean) {

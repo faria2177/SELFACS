@@ -152,6 +152,7 @@ class AIAgentManager(private val context: Context) {
         var success = false
         var lastError: Throwable? = null
         var providerSwitched = false
+        val triedProviders = mutableSetOf<String>()
 
         if (currentAgent?.isInitialized() != true) {
             callback.onError("Configure an AI provider and model in AI Settings before sending a request.")
@@ -177,6 +178,7 @@ class AIAgentManager(private val context: Context) {
 
                 result.fold(
                     onSuccess = { response ->
+                        ProviderHealth.mark(context, currentProviderId, true)
                         
                         if (allowEdits && response.lineSequence().any { it.startsWith("FILE_TO_MODIFY: ") }) {
                             success = true // Never automatically retry an approved write batch.
@@ -210,36 +212,37 @@ class AIAgentManager(private val context: Context) {
                       lastError = error
                       android.util.Log.e("AIAgentManager", "Error occurred: ${error.message}", error)
                       
-                      val shouldSwitchProvider = error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.QuotaExceededException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException ||
-                                                error is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException
-                      
-                      if (shouldSwitchProvider && !providerSwitched) {
+                      val shouldSwitchProvider = error !is java.net.UnknownHostException && (
+                          error is com.tom.rv2ide.artificial.exceptions.RateLimitException ||
+                          error is com.tom.rv2ide.artificial.exceptions.QuotaExceededException ||
+                          error is com.tom.rv2ide.artificial.exceptions.InsufficientBalanceException ||
+                          error is com.tom.rv2ide.artificial.exceptions.InvalidApiKeyException ||
+                          error is com.tom.rv2ide.artificial.exceptions.NonRetryableProviderException ||
+                          error is IllegalStateException ||
+                          error is java.io.IOException)
+
+                      if (shouldSwitchProvider) {
                           val currentProviderName = currentAgent?.providerName ?: "Unknown"
-                          val errorMsg = error.message ?: "Unknown error"
-                          
+                          val errorMsg = (error.message ?: "Unknown error").lineSequence().first().take(140)
+                          triedProviders += currentProviderId
+                          ProviderHealth.mark(context, currentProviderId, false)
+
                           if (providerSwitchDialog.isAutoSwitchEnabled()) {
-                              val alternativeProvider = getAlternativeProvider()
-                              if (alternativeProvider != null) {
-                                  callback.onProcessing("⚠️ $currentProviderName: $errorMsg")
-                                  callback.onProcessing("🔄 Auto-switching to another provider...")
-                                  delay(1500)
-                                  
-                                  if (setProvider(alternativeProvider)) {
-                                      providerSwitched = true
-                                      currentAgent?.resetAttemptCount()
-                                      
-                                      val newProviderName = currentAgent?.providerName ?: "Unknown"
-                                      callback.onProcessing("✅ Switched to $newProviderName")
-                                  } else {
-                                      val errorDisplay = formatErrorMessage(error)
-                                      callback.onError("$errorDisplay\n\n❌ Failed to switch providers.")
-                                      success = true
-                                  }
+                              callback.onProcessing("⚠️ $currentProviderName: $errorMsg")
+                              var switched = false
+                              for (candidate in getAlternativeProviders(triedProviders)) {
+                                  triedProviders += candidate
+                                  if (setProvider(candidate)) { switched = true; break }
+                              }
+                              if (switched) {
+                                  providerSwitched = true
+                                  currentAgent?.resetAttemptCount()
+                                  callback.onProcessing("🔄 Switched to ${currentAgent?.providerName ?: "another provider"}")
+                                  delay(800)
                               } else {
                                   val errorDisplay = formatErrorMessage(error)
-                                  callback.onError("$errorDisplay\n\n❌ No alternative providers available.")
+                                  val tried = triedProviders.size
+                                  callback.onError("$errorDisplay\n\n❌ No other working AI provider (tried $tried). Add another provider or more models, or use “Check all AI providers” in AI settings.")
                                   success = true
                               }
                           } else {
@@ -339,6 +342,10 @@ class AIAgentManager(private val context: Context) {
         val availableProviders = AIAgentRegistry.getAvailableProviders()
         return availableProviders.firstOrNull { it != currentProviderId }
     }
+
+    /** Configured providers not yet tried, recently working ones first. */
+    private fun getAlternativeProviders(exclude: Set<String>): List<String> =
+        ProviderHealth.orderForSwitch(context, AIAgentRegistry.getAvailableProviders().filter { it !in exclude && it != currentProviderId })
 
     private suspend fun applyReviewedEdits(root: File, edits: List<ProposedEdit>, callback: AIAgentCallback): List<ModificationResult> {
         val results = mutableListOf<ModificationResult>()

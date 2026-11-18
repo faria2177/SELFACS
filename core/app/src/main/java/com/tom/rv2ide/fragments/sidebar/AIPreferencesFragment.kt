@@ -190,7 +190,84 @@ class AIPreferencesFragment(
         }
     }
 
+    // ---------- provider health check ----------
+
+    private fun addCheckProvidersButton() {
+        val row = autoSwitchToggle.parent as? View ?: return
+        val column = row.parent as? ViewGroup ?: return
+        if (column.findViewWithTag<View>("selfacs_check_providers") != null) return
+        val button = com.google.android.material.button.MaterialButton(
+            requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            tag = "selfacs_check_providers"
+            text = "Check all AI providers"
+            isAllCaps = false
+            setOnClickListener { runProviderCheck() }
+        }
+        column.addView(button, column.indexOfChild(row) + 1,
+            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun runProviderCheck() {
+        val ctx = requireContext()
+        val count = com.tom.rv2ide.artificial.agents.AIAgentRegistry.getAvailableProviders().size
+        if (count == 0) { showSnackbar("No AI provider is configured yet."); return }
+        val progress = com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+            .setTitle("Checking AI providers")
+            .setMessage("Sending a short test to $count provider(s) and each configured model…")
+            .setCancelable(false)
+            .create()
+        progress.show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val results = runCatching { com.tom.rv2ide.artificial.agents.ProviderHealth.checkAll(ctx) }
+            progress.dismiss()
+            if (!isAdded) return@launch
+            val list = results.getOrElse { showSnackbar("Check failed: ${it.message}"); return@launch }
+            fun secs(ms: Long) = "%.1fs".format(ms / 1000.0)
+            val report = buildString {
+                for (r in list) {
+                    append(if (r.ok) "✅ " else "❌ ").append(r.name)
+                    if (r.models.isEmpty()) append(" · ").append(secs(r.millis))
+                    append('\n')
+                    if (r.models.isNotEmpty()) {
+                        for (m in r.models) {
+                            append("   ").append(if (m.error == null) "✅ " else "❌ ").append(m.model)
+                            append(" · ").append(secs(m.millis)).append('\n')
+                            m.error?.let { append("      ").append(it.take(120)).append('\n') }
+                        }
+                    } else if (r.error != null) {
+                        append("   ").append(r.error.take(160)).append('\n')
+                    }
+                }
+                append("\nAuto-switch uses working providers first.")
+            }
+            val partial = list.filter { r -> r.models.any { it.error == null } && r.models.any { it.error != null } }
+            val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+                .setTitle("${list.count { it.ok }} of ${list.size} provider(s) working")
+                .setMessage(report)
+                .setPositiveButton("OK", null)
+            if (partial.isNotEmpty()) {
+                val failing = partial.sumOf { r -> r.models.count { it.error != null } }
+                builder.setNeutralButton("Remove $failing failing model(s)") { _, _ ->
+                    var removed = 0
+                    for (r in partial) {
+                        val provider = CloudProviders.find(r.providerId) ?: continue
+                        val config = CloudProviders.get(ctx, r.providerId) ?: continue
+                        val working = r.models.filter { it.error == null }.map { it.model }
+                        runCatching {
+                            CloudProviders.save(ctx, provider, config.copy(
+                                model = com.tom.rv2ide.artificial.agents.compatible.ModelList.join(working)))
+                        }.onSuccess { removed += r.models.size - working.size }
+                    }
+                    showSnackbar("Removed $removed failing model(s)")
+                }
+            }
+            builder.show()
+        }
+    }
+
     private fun setupToggles() {
+        addCheckProvidersButton()
         autoSwitchToggle.isChecked = providerSwitchDialog.isAutoSwitchEnabled()
         autoSwitchToggle.setOnCheckedChangeListener { _, isChecked ->
             providerSwitchDialog.setAutoSwitch(isChecked)

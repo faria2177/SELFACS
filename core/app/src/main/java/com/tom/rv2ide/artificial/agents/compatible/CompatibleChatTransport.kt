@@ -25,7 +25,42 @@ internal object CompatibleChatTransport {
         return msg.replace(key, "***").replace(Regex("\\s+"), " ").trim().take(400)
     }
 
-    fun complete(provider: CloudProviders.Provider, config: CloudProviders.Config, system: String, prompt: String): String {
+    /**
+     * Tries the configured models in order. A model that is rate limited, removed, overloaded or
+     * returns an unusable answer is skipped; key/billing/network errors stop immediately.
+     */
+    fun complete(
+        provider: CloudProviders.Provider,
+        config: CloudProviders.Config,
+        system: String,
+        prompt: String,
+        onModelFailed: ((model: String, error: Throwable) -> Unit)? = null,
+    ): String {
+        val models = config.models
+        require(models.isNotEmpty()) { "${provider.name}: no model configured" }
+        var last: Throwable? = null
+        for ((i, model) in models.withIndex()) {
+            try {
+                return completeOne(provider, config, model, system, prompt)
+            } catch (e: Exception) {
+                last = e
+                if (!ModelList.tryNextModel(e) || i == models.lastIndex) break
+                onModelFailed?.invoke(model, e)
+            }
+        }
+        val error = last ?: IllegalStateException("${provider.name}: request failed")
+        if (models.size > 1 && ModelList.tryNextModel(error)) {
+            val msg = "All ${models.size} ${provider.name} models failed. Last error: ${error.message}"
+            throw when (error) {
+                is RateLimitException -> RateLimitException(msg)
+                is NonRetryableProviderException -> NonRetryableProviderException(msg)
+                else -> IllegalStateException(msg, error)
+            }
+        }
+        throw error
+    }
+
+    fun completeOne(provider: CloudProviders.Provider, config: CloudProviders.Config, model: String, system: String, prompt: String): String {
         require(CloudProviders.validEndpoint(provider, config.endpoint))
         val connection = URL(config.endpoint).openConnection() as HttpURLConnection
         try {
@@ -39,7 +74,7 @@ internal object CompatibleChatTransport {
             val messages = JSONArray()
                 .put(JSONObject().put("role", "system").put("content", system))
                 .put(JSONObject().put("role", "user").put("content", prompt))
-            val body = JSONObject().put("model", config.model).put("messages", messages).put("stream", false)
+            val body = JSONObject().put("model", model).put("messages", messages).put("stream", false)
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val code = connection.responseCode
             if (code !in 200..299) {
@@ -50,10 +85,10 @@ internal object CompatibleChatTransport {
                     401 -> throw InvalidApiKeyException("${provider.name}: API key rejected (401)$suffix")
                     403 -> throw InvalidApiKeyException("${provider.name}: access denied (403)$suffix")
                     402 -> throw InsufficientBalanceException("${provider.name}: payment or credits required (402)$suffix")
-                    429 -> throw RateLimitException("${provider.name}: rate limit or quota exceeded (429)$suffix")
-                    404 -> throw NonRetryableProviderException("${provider.name}: model or endpoint not available (404)$suffix")
-                    400, 413, 422 -> throw NonRetryableProviderException("${provider.name}: request rejected ($code)$suffix")
-                    else -> throw IllegalStateException("${provider.name}: HTTP $code$suffix")
+                    429 -> throw RateLimitException("${provider.name} [$model]: rate limit or quota exceeded (429)$suffix")
+                    404 -> throw NonRetryableProviderException("${provider.name} [$model]: model or endpoint not available (404)$suffix")
+                    400, 413, 422 -> throw NonRetryableProviderException("${provider.name} [$model]: request rejected ($code)$suffix")
+                    else -> throw IllegalStateException("${provider.name} [$model]: HTTP $code$suffix")
                 }
             }
             val raw = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
