@@ -48,6 +48,7 @@ constructor(
     const val ACTION_DONATE = 5
     const val ACTION_DOCS = 6
     const val ACTION_TOOLCHAIN_STATUS = 7
+    const val ACTION_FLUTTER_STUDIO = 8
 
     /** Get all main screen actions. */
     @JvmStatic
@@ -81,6 +82,7 @@ constructor(
             this,
             createProject,
             openProject,
+            MainScreenAction(ACTION_FLUTTER_STUDIO, R.string.selfacs_flutter_studio, R.drawable.ic_code),
             cloneGitRepository,
             openTerminal,
             toolchainStatus,

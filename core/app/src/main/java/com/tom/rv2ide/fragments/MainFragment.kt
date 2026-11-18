@@ -116,6 +116,7 @@ class MainFragment : BaseFragment() {
               MainScreenAction.ACTION_OPEN_TERMINAL ->
                   startActivity(Intent(requireActivity(), TerminalActivity::class.java))
 
+              MainScreenAction.ACTION_FLUTTER_STUDIO -> startActivity(Intent(requireActivity(), com.tom.rv2ide.flutter.FlutterStudioActivity::class.java))
               MainScreenAction.ACTION_TOOLCHAIN_STATUS -> showToolchainStatus()
               MainScreenAction.ACTION_PREFERENCES -> gotoPreferences()
               MainScreenAction.ACTION_DONATE -> {

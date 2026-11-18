@@ -1,0 +1,256 @@
+/*
+ * SELFACS contribution. GPL-3.0-or-later.
+ */
+package com.tom.rv2ide.flutter
+
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+/** Isolated Flutter source workspace, not a bundled Flutter SDK. */
+object FlutterWorkspace {
+    private val projectName = Regex("[a-z][a-z0-9_]{0,47}")
+    private val workspaceName = Regex("[a-z][a-z0-9_]{0,47}")
+    private val excluded = setOf(".git", ".dart_tool", ".gradle", ".idea", "build", "node_modules")
+    private val editableExtensions = setOf("dart", "yaml", "yml", "json", "md", "txt", "xml", "kt", "java", "gradle", "kts", "properties", "swift", "html", "css", "js")
+    private const val MAX_EDIT = 512000
+    private const val MAX_ARCHIVE = 128L * 1024 * 1024
+
+    fun validName(name: String) = name.matches(projectName) &&
+        name !in setOf("class", "import", "library", "part", "void", "return", "switch", "new", "null", "true", "false", "flutter", "dart", "test")
+
+    fun safeTarget(root: File, relative: String): File {
+        require(relative.isNotBlank() && !relative.startsWith("/") && !relative.contains('\\') && !relative.contains(':'))
+        require(relative.split('/').all { it.isNotBlank() && it != "." && it != ".." })
+        val base = root.canonicalFile
+        val raw = File(base, relative)
+        val target = raw.canonicalFile
+        require(target.path == raw.absolutePath && target.path.startsWith(base.path + File.separator)) { "Unsafe path" }
+        return target
+    }
+
+    private fun isExcluded(path: String): Boolean {
+        val parts = path.lowercase().split('/')
+        val name = parts.last()
+        return parts.any { it in excluded } || name == ".env" || name.startsWith(".env.") ||
+            name == "local.properties" || name == "key.properties" || name.endsWith(".jks") ||
+            name.endsWith(".keystore") || name.endsWith(".p12") || name.endsWith(".pem") ||
+            name == "google-services.json"
+    }
+
+    fun projects(root: File): List<File> = root.listFiles().orEmpty().filter {
+        it.isDirectory && it.name.matches(workspaceName) &&
+            it.absolutePath == runCatching { it.canonicalPath }.getOrNull() && File(it, "pubspec.yaml").isFile
+    }.sortedBy { it.name }
+
+    fun create(root: File, name: String): File {
+        require(validName(name)) { "Use a valid lowercase Dart package name (letters, numbers, underscores)." }
+        val folder = safeTarget(root, name)
+        require(folder.mkdir()) { "Workspace already exists or cannot be created." }
+        try {
+            File(folder, "lib").mkdir()
+            File(folder, "test").mkdir()
+            File(folder, "pubspec.yaml").writeText("""
+                name: $name
+                description: A Flutter app created with SELFACS.
+                publish_to: 'none'
+                version: 1.0.0+1
+                environment:
+                  sdk: '>=3.3.0 <4.0.0'
+                dependencies:
+                  flutter:
+                    sdk: flutter
+                dev_dependencies:
+                  flutter_test:
+                    sdk: flutter
+                flutter:
+                  uses-material-design: true
+            """.trimIndent() + "\n")
+            File(folder, "lib/main.dart").writeText("""
+                import 'package:flutter/material.dart';
+
+                void main() => runApp(const MyApp());
+
+                class MyApp extends StatelessWidget {
+                  const MyApp({super.key});
+
+                  @override
+                  Widget build(BuildContext context) {
+                    return MaterialApp(
+                      title: '$name',
+                      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+                      home: Scaffold(
+                        appBar: AppBar(title: const Text('$name')),
+                        body: const Center(child: Text('Hello SELFACS')),
+                      ),
+                    );
+                  }
+                }
+            """.trimIndent() + "\n")
+            File(folder, "test/widget_test.dart").writeText("""
+                import 'package:flutter_test/flutter_test.dart';
+                import 'package:$name/main.dart';
+
+                void main() {
+                  testWidgets('starter renders', (tester) async {
+                    await tester.pumpWidget(const MyApp());
+                    expect(find.text('Hello SELFACS'), findsOneWidget);
+                  });
+                }
+            """.trimIndent() + "\n")
+            File(folder, ".gitignore").writeText(".dart_tool/\nbuild/\n.android/\n.gradle/\n.idea/\nlocal.properties\nkey.properties\n*.jks\n.env\n.env.*\n")
+            File(folder, "README.md").writeText("# $name\n\nFlutter source workspace generated by SELFACS. Run flutter create --platforms=android --no-pub . to add the Android host before building, if missing.\n")
+            return folder
+        } catch (e: Exception) { folder.deleteRecursively(); throw e }
+    }
+
+    fun files(project: File): List<String> = project.walkTopDown()
+        .onEnter { it == project || (!isExcluded(it.relativeTo(project).invariantSeparatorsPath) && it.absolutePath == runCatching { it.canonicalPath }.getOrNull()) }
+        .take(15000).filter { it.isFile }.map { it.relativeTo(project).invariantSeparatorsPath }
+        .filter { !isExcluded(it) && it.substringAfterLast('.').lowercase() in editableExtensions }
+        .take(2000).sorted().toList()
+
+    fun read(project: File, relative: String): String {
+        val file = safeTarget(project, relative)
+        require(!isExcluded(relative) && file.isFile && file.length() <= MAX_EDIT)
+        return file.readText().also { require('\u0000' !in it) }
+    }
+
+    fun save(project: File, relative: String, text: String, expected: String?) {
+        require(!isExcluded(relative) && relative.substringAfterLast('.').lowercase() in editableExtensions)
+        val file = safeTarget(project, relative)
+        require(text.toByteArray().size <= MAX_EDIT && '\u0000' !in text)
+        require(if (expected == null) !file.exists() else file.isFile && file.length() <= MAX_EDIT && file.readText() == expected) { "File changed since opening." }
+        file.parentFile?.mkdirs()
+        val temp = File.createTempFile(".selfacs-", ".tmp", file.parentFile!!)
+        try {
+            temp.writeText(text)
+            Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally { temp.delete() }
+    }
+
+    /** ZIP import creates a copy. Root pubspec.yaml, or one wrapping directory, is required. */
+    fun importZip(root: File, name: String, input: InputStream): File {
+        require(validName(name))
+        val target = safeTarget(root, name)
+        require(!target.exists()) { "Workspace already exists" }
+        val stage = File(root, ".import-" + UUID.randomUUID())
+        require(stage.mkdir())
+        try {
+            var total = 0L
+            var count = 0
+            val seen = hashSetOf<String>()
+            ZipInputStream(input.buffered()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    require(++count <= 12000) { "ZIP has too many entries" }
+                    val path = entry.name.trimEnd('/')
+                    val file = safeTarget(stage, path)
+                    require(seen.add(path)) { "Duplicate ZIP entry" }
+                    if (entry.isDirectory) file.mkdirs()
+                    else {
+                        // Count even excluded data, preventing compressed-size bypass.
+                        val keep = !isExcluded(path)
+                        if (keep) file.parentFile?.mkdirs()
+                        val output = if (keep) file.outputStream().buffered() else null
+                        try {
+                            val buffer = ByteArray(8192)
+                            while (true) {
+                                val n = zip.read(buffer)
+                                if (n < 0) break
+                                total += n
+                                require(total <= MAX_ARCHIVE) { "ZIP expands beyond 128 MiB" }
+                                output?.write(buffer, 0, n)
+                            }
+                        } finally { output?.close() }
+                    }
+                    zip.closeEntry()
+                }
+            }
+            val source = if (File(stage, "pubspec.yaml").isFile) stage else
+                stage.listFiles().orEmpty().filter { it.isDirectory && File(it, "pubspec.yaml").isFile }.singleOrNull()
+                    ?: error("ZIP must contain a Flutter project with pubspec.yaml")
+            require(File(source, "pubspec.yaml").length() <= MAX_EDIT)
+            require(File(source, "pubspec.yaml").readText().contains("sdk: flutter")) { "Not a Flutter project" }
+            require(!target.exists() && source.renameTo(target)) { "Could not finish import" }
+            return target
+        } finally { stage.deleteRecursively() }
+    }
+
+    fun exportZip(project: File, output: OutputStream) {
+        ZipOutputStream(output.buffered()).use { zip ->
+            var total = 0L
+            var count = 0
+            for (file in project.walkTopDown().onEnter { it == project || (!isExcluded(it.relativeTo(project).invariantSeparatorsPath) && it.absolutePath == runCatching { it.canonicalPath }.getOrNull()) }) {
+                require(++count <= 15000) { "Workspace too large" }
+                if (!file.isFile) continue
+                val path = file.relativeTo(project).invariantSeparatorsPath
+                if (isExcluded(path)) continue
+                val safe = safeTarget(project, path)
+                total += safe.length()
+                require(total <= MAX_ARCHIVE) { "Export exceeds 128 MiB" }
+                zip.putNextEntry(ZipEntry(path))
+                safe.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+    }
+
+    fun addBuildWorkflow(project: File) {
+        val file = safeTarget(project, ".github/workflows/flutter-apk.yml")
+        require(!file.exists()) { "Existing Flutter workflow was not overwritten" }
+        file.parentFile?.mkdirs()
+        file.writeText(WORKFLOW)
+    }
+
+    private val WORKFLOW = """
+        name: Flutter Android APK
+        on:
+          workflow_dispatch:
+          push:
+            branches: [main, master]
+        permissions:
+          contents: read
+        jobs:
+          build:
+            runs-on: ubuntu-latest
+            timeout-minutes: 45
+            steps:
+              - uses: actions/checkout@v4
+                with:
+                  persist-credentials: false
+              - uses: actions/setup-java@v4
+                with:
+                  distribution: temurin
+                  java-version: '17'
+              - uses: subosito/flutter-action@v2
+                with:
+                  channel: stable
+              - name: Initialize Android host only if absent
+                shell: bash
+                run: |
+                  if [ ! -d android ]; then
+                    flutter create --platforms=android --no-pub .
+                  fi
+              - run: flutter pub get
+              - run: flutter analyze
+              - name: Run tests when present
+                shell: bash
+                run: |
+                  if [ -d test ] && find test -name '*_test.dart' -print -quit | grep -q .; then
+                    flutter test
+                  fi
+              - run: flutter build apk --debug
+              - uses: actions/upload-artifact@v4
+                with:
+                  name: flutter-debug-apk
+                  path: build/app/outputs/flutter-apk/app-debug.apk
+                  if-no-files-found: error
+    """.trimIndent() + "\n"
+}

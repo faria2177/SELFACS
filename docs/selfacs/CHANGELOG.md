@@ -29,3 +29,10 @@
 - Atomic per-file writes, backup, stop after first failure, conflict-aware undo.
 - Read-only ask, code review, project analysis and pasted build-log modes. No automatic command execution or build.
 - Unit tests added; APK and device verification pending.
+
+## Flutter & Dart Studio
+
+- Separate private source workspace and Sora text editor, Flutter starter with pubspec/main.dart/widget test, project/file picker, save and new file.
+- Bounded ZIP import/export, path validation, conflict checks, common sensitive/generated file exclusions.
+- Explicit GitHub Actions template generation for Flutter analysis, tests and debug APK. Export and push to a separate repository manually; no Flutter SDK bundled, no direct Actions dispatch, no Dart analysis server yet.
+- Workspace unit tests included; Android integration and device testing pending.
