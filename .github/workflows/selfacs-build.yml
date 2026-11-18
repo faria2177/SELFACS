@@ -96,11 +96,19 @@ jobs:
             ./gradlew :editor:publishToMavenLocal -I "$RUNNER_TEMP/no-sign.init.gradle" --stacktrace
           )
           find . -name libs.versions.toml -not -path '*/build/*' -exec sed -i 's/^\(editor = \)"0.24.7-acs"/\1"0.24.7-acs-SNAPSHOT"/' {} +
+      - name: Build logger runtime AAR (bundled into the app)
+        run: |
+          set -euo pipefail
+          ./gradlew :external:logwire:bundleReleaseAar --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
+          test -s core/app/src/main/assets/logger-runtime.aar
+          unzip -l core/app/src/main/assets/logger-runtime.aar | grep -E "AndroidManifest.xml|classes.jar"
       - name: Test AI edit planner and Flutter workspace
         run: ./gradlew :core:app:testDebugUnitTest --tests com.tom.rv2ide.artificial.review.EditPlanTest --tests com.tom.rv2ide.flutter.FlutterWorkspaceTest --tests com.tom.rv2ide.github.GitHubValidationTest --tests com.tom.rv2ide.updates.SelfacsVersionTest --tests com.tom.rv2ide.artificial.agentic.AgentToolsTest --tests com.tom.rv2ide.artificial.agentic.BuildErrorsTest --tests com.tom.rv2ide.artificial.history.AIChatHistoryTest --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
       - name: Assemble debug APK
         run: |
           ./gradlew :core:app:assembleDebug --stacktrace --no-daemon -DMAIN_VERSION=1.0.0 -DREVISION_NUM=05 -DANDROID_VERSION_CODE=1050 -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=1050
+      - name: Check bundled logger runtime
+        run: unzip -l core/app/build/outputs/apk/debug/*arm64*.apk | grep "assets/logger-runtime.aar"
       - name: Upload debug APKs
         uses: actions/upload-artifact@v4
         with:

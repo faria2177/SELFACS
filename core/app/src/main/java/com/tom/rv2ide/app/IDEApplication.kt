@@ -252,8 +252,21 @@ class IDEApplication : TermuxApplication() {
 
       val targetFile = File(pluginsDir, "logger-runtime.aar")
 
+      val bundled = runCatching { assets.list("")?.contains("logger-runtime.aar") == true }.getOrDefault(false)
+      if (!bundled) {
+        // Never leave a stale/empty AAR behind: the build service would inject it into projects.
+        if (targetFile.exists()) targetFile.delete()
+        log.warn("logger-runtime.aar is not bundled in this build; app log capture disabled")
+        return
+      }
+
+      val tmp = File(pluginsDir, "logger-runtime.aar.tmp")
       assets.open("logger-runtime.aar").use { input ->
-        FileOutputStream(targetFile).use { output -> input.copyTo(output) }
+        FileOutputStream(tmp).use { output -> input.copyTo(output) }
+      }
+      if (!tmp.renameTo(targetFile)) {
+        tmp.copyTo(targetFile, overwrite = true)
+        tmp.delete()
       }
 
       log.info("Successfully extracted logger-runtime.aar to: ${targetFile.absolutePath}")

@@ -93,6 +93,7 @@ SELFACS হলো Android Code Studio-ভিত্তিক Android IDE। ম�
 - [ ] Build status, artifact link ও test evidence এই ফাইলে লিখে রাখা।
 
 ### P1 — Android Code Studio core usability
+- [x] Bug (device): সব Android project sync fail — "Null extracted folder for artifact logger-runtime.aar"। কারণ: upstream `.gitignore`-এর জন্য `logger-runtime.aar` APK-তে ছিল না, অথচ IDE সেটা project-এ inject করত। Fix: CI-তে `:external:logwire:bundleReleaseAar` build করে asset-এ রাখা ও APK-তে আছে কিনা যাচাই; app-এ AAR না থাকলে/নষ্ট হলে inject বন্ধ ও stale ফাইল মুছে ফেলা।
 - [x] Branding audit (ধাপ ১): সব ভাষার user-facing string-এ "Android Code Studio/AndroidCS/AndroidIDE" → SELFACS (license header ও upstream credit অপরিবর্তিত); About-এ upstream Telegram/email সরিয়ে GitHub Issues ও "Based on Android Code Studio"; Docs/help/crash-report/changelog লিংক SELFACS repo-তে; contributors পাতা upstream-এ (credit)।
 - [x] Privacy: upstream (androidide.com)-এ usage statistics পাঠানো সম্পূর্ণ বন্ধ, আগের scheduled upload বাতিল, onboarding-এ stats slide বাদ, default opt-out।
 - [ ] Branding ধাপ ২: icon/launcher ও screenshots যাচাই (device)।

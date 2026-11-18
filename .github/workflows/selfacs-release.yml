@@ -148,6 +148,12 @@ jobs:
             echo "SIGNING_KEY_PASSWORD=$KEY_PASS"
             echo "SIGNING_KEY_ALIAS=$KEY_ALIAS"
           } >> "$GITHUB_ENV"
+      - name: Build logger runtime AAR (bundled into the app)
+        run: |
+          set -euo pipefail
+          ./gradlew :external:logwire:bundleReleaseAar --stacktrace --no-daemon -DMAIN_VERSION=${{ steps.ver.outputs.version }} -DREVISION_NUM=05 -DANDROID_VERSION_CODE=${{ steps.ver.outputs.code }} -DPROJECT_CONFIG_KT_BASE_VERSION_CODE=${{ steps.ver.outputs.code }}
+          test -s core/app/src/main/assets/logger-runtime.aar
+          unzip -l core/app/src/main/assets/logger-runtime.aar | grep -E "AndroidManifest.xml|classes.jar"
       - name: Assemble release APK
         run: >-
           ./gradlew :core:app:assembleRelease --stacktrace --no-daemon
@@ -163,6 +169,7 @@ jobs:
           mkdir -p out
           ls -la core/app/build/outputs/apk/release/
           for f in core/app/build/outputs/apk/release/*.apk; do
+            unzip -l "$f" | grep "assets/logger-runtime.aar" >/dev/null || { echo "::error::logger-runtime.aar missing in $f"; exit 1; }
             "$signer" verify --verbose --print-certs "$f" > verify.txt
             grep -E "Verified using|certificate (DN|SHA-256)" verify.txt || cat verify.txt
             abi=""

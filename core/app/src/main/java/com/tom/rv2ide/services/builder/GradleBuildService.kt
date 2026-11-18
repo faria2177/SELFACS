@@ -267,6 +267,25 @@ class GradleBuildService :
     return dir
   }
 
+  /** The logger runtime AAR if it exists and is a real Android library archive, otherwise null. */
+  private fun validLoggerRuntimeAar(): File? {
+    val aar = getLoggerRuntimeAar()
+    val ok =
+        aar.isFile && aar.length() > 0 &&
+            runCatching {
+                  java.util.zip.ZipFile(aar).use { zip ->
+                    zip.getEntry("AndroidManifest.xml") != null && zip.getEntry("classes.jar") != null
+                  }
+                }
+                .getOrDefault(false)
+    if (!ok) {
+      if (aar.exists()) aar.delete()
+      log.warn("Logger runtime AAR missing or invalid; app log capture is disabled for this build")
+      return null
+    }
+    return aar
+  }
+
   /** Extracts and returns the logger runtime AAR file. */
   private fun getLoggerRuntimeAar(): File {
     val aar = File(getLoggerPluginDir(), "logger-runtime.aar")
@@ -373,8 +392,10 @@ class GradleBuildService :
 
   override fun getBuildArguments(): CompletableFuture<List<String>> {
     val extraArgs = ArrayList<String>()
-    
-    if (DevOpsPreferences.logsenderEnabled) {
+
+    // SELFACS: only inject the logger when its runtime AAR is really available; a missing or
+    // broken AAR made every Android project fail to sync ("Null extracted folder for artifact").
+    if (DevOpsPreferences.logsenderEnabled && validLoggerRuntimeAar() != null) {
       injectLoggerForCurrentBuild()
       if (!isReleaseVariant) {
         val initScriptPath = System.getProperty("ide.logger.init.script")

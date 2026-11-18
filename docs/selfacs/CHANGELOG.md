@@ -2,6 +2,7 @@
 
 ## Next
 
+- Fixed: Android projects failed to sync with "Null extracted folder for artifact logger-runtime.aar". The logger runtime is now bundled, and it is never injected when unavailable.
 - SELFACS branding across the app (all languages). About now links to SELFACS GitHub issues and credits the upstream Android Code Studio project.
 - Privacy: usage statistics are no longer sent to the upstream project's server (disabled entirely).
 - AI panel: History button keeps your requests and answers per project (stored privately on the device, not in the project). The last answer is shown again when you reopen the editor.
