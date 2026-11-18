@@ -217,7 +217,7 @@ class GitHubStudioFragment : Fragment() {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         })
         top.addView(TextView(requireContext()).apply {
-            text = if (repo.private) "PRIVATE" else "PUBLIC"
+            text = if (repo.isPrivate) "PRIVATE" else "PUBLIC"
             textSize = 10f
         })
         column.addView(top)
